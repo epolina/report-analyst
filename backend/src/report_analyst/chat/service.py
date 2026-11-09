@@ -251,14 +251,11 @@ class ChatService:
         ready_reports = [r for r in reports if r.status is ReportStatus.SUCCESS]
         if not ready_reports:
             raise QuestionNotAnsweredError(NotFoundReason.REPORT_NOT_READY, reports=reports)
-        facts = [
-            relevant_fact
-            for report in ready_reports
-            for relevant_fact in _collect_relevant_facts(
-                report, self._reports.facts(report.report_id) or Facts(), fact
-            )
-        ]
-        return RelevantFacts(reports=reports, facts=facts)
+        relevant_facts: list[RelevantFact] = []
+        for report in ready_reports:
+            report_facts = self._reports.facts(report.report_id) or Facts()
+            relevant_facts += _collect_relevant_facts(report, report_facts, fact)
+        return RelevantFacts(reports=reports, facts=relevant_facts)
 
     def _generate_answer(
         self, question: str, history: list[Turn], fact: FactKind, relevant_facts: RelevantFacts
