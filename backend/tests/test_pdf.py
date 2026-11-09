@@ -37,7 +37,7 @@ def test_mistral_blocks_become_headings_text_and_tables_with_boxes() -> None:
         )
     )
 
-    blocks = mistral_extractor._blocks(page)
+    blocks = mistral_extractor._page_blocks(page)
 
     assert [(b.page, b.kind, b.text) for b in blocks] == [
         (3, BlockKind.HEADING, "Climate"),

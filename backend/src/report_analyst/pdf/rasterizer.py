@@ -28,8 +28,8 @@ def page_count(pdf: bytes) -> int:
         ExtractionError: pdfium can't open the bytes as a PDF.
     """
     try:
-        with _PDFIUM_LOCK, pdfium.PdfDocument(pdf) as doc:
-            return len(doc)
+        with _PDFIUM_LOCK, pdfium.PdfDocument(pdf) as document:
+            return len(document)
     except pdfium.PdfiumError as error:
         raise ExtractionError(str(error)) from error
 
@@ -43,16 +43,16 @@ def render_pages(pdf: bytes) -> list[bytes]:
     Returns:
         The JPEG bytes of each page, in order.
     """
-    with _PDFIUM_LOCK, pdfium.PdfDocument(pdf) as doc:
-        return [_jpeg(page) for page in doc]
+    with _PDFIUM_LOCK, pdfium.PdfDocument(pdf) as document:
+        return [_render_jpeg(page) for page in document]
 
 
-def _jpeg(page: pdfium.PdfPage) -> bytes:
+def _render_jpeg(page: pdfium.PdfPage) -> bytes:
     # Closes what pdfium allocated here, under the caller's lock, not later in the GC.
     width, _ = page.get_size()
     bitmap = page.render(scale=_PAGE_WIDTH_PX / width)
-    out = io.BytesIO()
-    bitmap.to_pil().save(out, "JPEG", quality=_JPEG_QUALITY)
+    buffer = io.BytesIO()
+    bitmap.to_pil().save(buffer, "JPEG", quality=_JPEG_QUALITY)
     bitmap.close()
     page.close()
-    return out.getvalue()
+    return buffer.getvalue()
