@@ -2,7 +2,7 @@
 
 from report_analyst.pdf.mistral_extractor import MistralExtractor, PdfExtractor
 from report_analyst.pdf.models import Block, BlockKind, ExtractionError, PageBox
-from report_analyst.pdf.rasterizer import page_count, render_pages
+from report_analyst.pdf.rasterizer import count_pages, render_pages
 
 
 __all__ = [
@@ -12,6 +12,6 @@ __all__ = [
     "MistralExtractor",
     "PageBox",
     "PdfExtractor",
-    "page_count",
+    "count_pages",
     "render_pages",
 ]

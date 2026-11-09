@@ -29,7 +29,7 @@
 // also keeps original_filename, for reference only; it isn't returned. A replaced report loses
 // its old content here; if the new PDF then fails, the report shows failed and can be retried.
 // Errors are {code, ...}; see Rules. Nothing is stored for any of them.
-// 409  ExistingOut {code, existing: Report}
+// 409  ExistingReportOut {code, existing: Report}
 //   "still_processing": replacing a report that is still processing.
 //   "same_file": a stored report has the same sha256. Refused whatever on_duplicate says.
 //   "same_company_year": a stored report has the same Company (any case) + year. The client
@@ -41,7 +41,7 @@
 //   413  TooLargeOut {code: "file_too_large", max_upload_mb} (MAX_UPLOAD_MB, default 100)
 
 // Report  (GET /reports returns Report[])
-{ "report_id": "<uuid>", "company_name": "Shell", "reporting_year": 2024, "sha256": "...", "pages": 412,
+{ "report_id": "<uuid>", "company_name": "Shell", "reporting_year": 2024, "sha256": "...", "page_count": 412,
   "status": "processing" | "success" | "failed",
   "failure": null }   // when failed: "unreadable_pdf" | "facts_failed" | "interrupted" | "unexpected"
 // Background processing: processing (Mistral OCR, page images, embeddings, then facts with Claude)
@@ -49,7 +49,7 @@
 // At start-up, reports left processing by a restart become failed ("interrupted").
 
 // GET /reports/{id} → 200 ReportDetail  (built, see facts/ and reports/service.py)
-{ ...Report,                                        // Report includes "pages"
+{ ...Report,                                        // Report includes "page_count"
   "fte": { "amount": 88497, "evidence": {"page": 93, "quote": "..."} } | null,  // null = not found
   "goals": [{ "title": "Net zero Scope 1 and 2 emissions by 2030",   // written by Claude
               "deadline": 2030 | null, "baseline": 2022 | null,
@@ -87,7 +87,7 @@
 ## Rules
 
 - Not Found is a `200` answer, not an error. HTTP errors are for bad input or a broken backend.
-- The backend sends codes, never copy. An error is `{"code": ErrorCode, ...}` (`ErrorOut`, `ExistingOut`, `TooLargeOut`); `failure` and Not Found `reason` are codes too. The frontend words them all in `src/messages.ts`. Only FastAPI's own 422 validation error keeps its `{"detail": [...]}`.
+- The backend sends codes, never copy. An error is `{"code": ErrorCode, ...}` (`ErrorOut`, `ExistingReportOut`, `TooLargeOut`); `failure` and Not Found `reason` are codes too. The frontend words them all in `src/messages.ts`. Only FastAPI's own 422 validation error keeps its `{"detail": [...]}`.
 - Answer `text` is plain text. Never HTML.
 - When a report is replaced, it keeps its `id`, so old Evidence still resolves.
 - The backend detects duplicates (409). The same file is refused; for the same Company and year the user decides: replace, or keep both. "Keep both" means a Company and year can have several reports.

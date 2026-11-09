@@ -63,7 +63,7 @@ class ReportRepository:
         company_name: str,
         reporting_year: int,
         content: bytes,
-        pages: int,
+        page_count: int,
         original_filename: str | None,
         report_id: UUID | None = None,
     ) -> Report:
@@ -75,7 +75,7 @@ class ReportRepository:
             company_name: The Company, spelled as it is stored.
             reporting_year: The Reporting Year.
             content: The PDF bytes.
-            pages: The number of pages.
+            page_count: The number of pages.
             original_filename: The uploaded file's name, kept in the metadata for reference.
             report_id: The report to replace; None creates a new report.
 
@@ -87,7 +87,7 @@ class ReportRepository:
             company_name=company_name,
             reporting_year=reporting_year,
             sha256=_sha256(content),
-            pages=pages,
+            page_count=page_count,
             status=ReportStatus.PROCESSING,
             original_filename=original_filename,
         )

@@ -5,7 +5,7 @@ import type { components } from "./api.gen";
 type Schemas = components["schemas"];
 type Report = Schemas["Report"];
 // Any error body: the code, plus the fields some codes carry.
-export type ErrorBody = Schemas["ErrorOut"] & Partial<Schemas["ExistingOut"] & Schemas["TooLargeOut"]>;
+export type ErrorBody = Schemas["ErrorOut"] & Partial<Schemas["ExistingReportOut"] & Schemas["TooLargeOut"]>;
 
 const UNREADABLE_PDF = "The PDF couldn't be read. Is it damaged?";
 const reportLabel = (r: Report) => `${r.company_name} ${r.reporting_year}`;

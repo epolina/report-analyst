@@ -39,7 +39,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExistingOut"
+                  "$ref": "#/components/schemas/ExistingReportOut"
                 }
               }
             }
@@ -221,14 +221,14 @@
         }
       }
     },
-    "/reports/{report_id}/pages/{number}": {
+    "/reports/{report_id}/pages/{page_number}": {
       "get": {
         "tags": [
           "reports"
         ],
         "summary": "Get Page",
-        "description": "Get one page of a report as a JPEG image, rendered while it was processed.\n\nArgs:\n    report_id: The report's id.\n    number: The page number, starting at 1.\n    repository: Where the page images are stored.\n\nReturns:\n    The image.\n\nRaises:\n    ApiError: 404 `page_not_found`, also for an unknown report.",
-        "operationId": "get_page_reports__report_id__pages__number__get",
+        "description": "Get one page of a report as a JPEG image, rendered while it was processed.\n\nArgs:\n    report_id: The report's id.\n    page_number: The page number, starting at 1.\n    repository: Where the page images are stored.\n\nReturns:\n    The image.\n\nRaises:\n    ApiError: 404 `page_not_found`, also for an unknown report.",
+        "operationId": "get_page_reports__report_id__pages__page_number__get",
         "parameters": [
           {
             "name": "report_id",
@@ -241,12 +241,12 @@
             }
           },
           {
-            "name": "number",
+            "name": "page_number",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Number"
+              "title": "Page Number"
             }
           }
         ],
@@ -680,7 +680,7 @@
         "title": "Evidence",
         "description": "A verbatim quote from a Report, the page it is on and where on the page.\n\nAttributes:\n    page: The page number, starting at 1.\n    quote: The sentence or table row that states the fact, copied verbatim.\n    boxes: Where the quote is: the boxes of the paragraph or table holding it, to highlight\n        it."
       },
-      "ExistingOut": {
+      "ExistingReportOut": {
         "properties": {
           "code": {
             "$ref": "#/components/schemas/ErrorCode"
@@ -694,7 +694,7 @@
           "code",
           "existing"
         ],
-        "title": "ExistingOut",
+        "title": "ExistingReportOut",
         "description": "An error about a stored report: a duplicate, or one still processing. Nothing was saved.\n\nAttributes:\n    existing: The stored report."
       },
       "Fte": {
@@ -809,9 +809,9 @@
             "type": "string",
             "title": "Sha256"
           },
-          "pages": {
+          "page_count": {
             "type": "integer",
-            "title": "Pages"
+            "title": "Page Count"
           },
           "status": {
             "$ref": "#/components/schemas/ReportStatus"
@@ -833,11 +833,11 @@
           "company_name",
           "reporting_year",
           "sha256",
-          "pages",
+          "page_count",
           "status"
         ],
         "title": "Report",
-        "description": "One Company's annual report for one Reporting Year.\n\nAttributes:\n    report_id: The report's id. Kept when the report is replaced.\n    company_name: The Company, spelled as it was first entered for any report.\n    reporting_year: The Reporting Year.\n    sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.\n    pages: The number of pages.\n    status: Where it is in processing.\n    failure: Why processing failed; None unless `status` is failed."
+        "description": "One Company's annual report for one Reporting Year.\n\nAttributes:\n    report_id: The report's id. Kept when the report is replaced.\n    company_name: The Company, spelled as it was first entered for any report.\n    reporting_year: The Reporting Year.\n    sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.\n    page_count: The number of pages.\n    status: Where it is in processing.\n    failure: Why processing failed; None unless `status` is failed."
       },
       "ReportDetail": {
         "properties": {
@@ -858,9 +858,9 @@
             "type": "string",
             "title": "Sha256"
           },
-          "pages": {
+          "page_count": {
             "type": "integer",
-            "title": "Pages"
+            "title": "Page Count"
           },
           "status": {
             "$ref": "#/components/schemas/ReportStatus"
@@ -899,7 +899,7 @@
           "company_name",
           "reporting_year",
           "sha256",
-          "pages",
+          "page_count",
           "status",
           "fte",
           "goals"

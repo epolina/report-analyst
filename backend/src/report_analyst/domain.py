@@ -55,7 +55,7 @@ class Report(BaseModel):
         company_name: The Company, spelled as it was first entered for any report.
         reporting_year: The Reporting Year.
         sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.
-        pages: The number of pages.
+        page_count: The number of pages.
         status: Where it is in processing.
         failure: Why processing failed; None unless `status` is failed.
     """
@@ -64,7 +64,7 @@ class Report(BaseModel):
     company_name: str
     reporting_year: int
     sha256: str
-    pages: int
+    page_count: int
     status: ReportStatus
     failure: ReportFailure | None = None
 

@@ -46,7 +46,7 @@ def test_upload_extracts_verified_facts_once(
     body = client.get(f"/reports/{report_id}").json()
 
     assert body["company_name"] == "Shell"
-    assert body["pages"] == 1
+    assert body["page_count"] == 1
     assert body["fte"] == {
         "amount": 12345,
         "evidence": {

@@ -37,7 +37,7 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
 │       ├── pdf/
 │       │   ├── models.py       # Block (heading/text/table, with its PageBox), ExtractionError
 │       │   ├── mistral_extractor.py  # PdfExtractor interface; MistralExtractor (Mistral OCR API)
-│       │   └── rasterizer.py   # page_count, render_pages (pdfium, one lock)
+│       │   └── rasterizer.py   # count_pages, render_pages (pdfium, one lock)
 │       ├── reports/
 │       │   ├── service.py      # ReportService: add (checks, duplicates) and the background job
 │       │   ├── repository.py   # ReportRepository: one folder per report

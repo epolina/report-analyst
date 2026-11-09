@@ -15,7 +15,7 @@ _JPEG_QUALITY = 85  # text stays crisp
 _PDFIUM_LOCK = threading.Lock()
 
 
-def page_count(pdf: bytes) -> int:
+def count_pages(pdf: bytes) -> int:
     """Count a PDF's pages.
 
     Args:

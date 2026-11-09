@@ -19,7 +19,7 @@ from report_analyst.routers.errors import (
     ApiError,
     ErrorCode,
     ErrorOut,
-    ExistingOut,
+    ExistingReportOut,
     TooLargeOut,
     api_error,
 )
@@ -35,7 +35,7 @@ BYTES_PER_MB = 1024 * 1024
     "",
     status_code=HTTPStatus.ACCEPTED,
     responses={
-        HTTPStatus.CONFLICT: {"model": ExistingOut},
+        HTTPStatus.CONFLICT: {"model": ExistingReportOut},
         HTTPStatus.REQUEST_ENTITY_TOO_LARGE: {"model": TooLargeOut},
         HTTPStatus.UNSUPPORTED_MEDIA_TYPE: {"model": ErrorOut},
     },
@@ -93,4 +93,4 @@ def upload(
 
 
 def _conflict_error(code: ErrorCode, existing: Report) -> ApiError:
-    return ApiError(HTTPStatus.CONFLICT, ExistingOut(code=code, existing=existing))
+    return ApiError(HTTPStatus.CONFLICT, ExistingReportOut(code=code, existing=existing))

@@ -3,7 +3,7 @@ from mistralai.client.models import OCRPageObject
 from report_analyst.pdf import (
     BlockKind,
     mistral_extractor,
-    page_count,
+    count_pages,
     render_pages,
 )
 
@@ -50,7 +50,7 @@ def test_mistral_blocks_become_headings_text_and_tables_with_boxes() -> None:
 
 
 def test_counts_and_renders_every_page(two_page_pdf: bytes) -> None:
-    assert page_count(two_page_pdf) == 2
+    assert count_pages(two_page_pdf) == 2
     images = render_pages(two_page_pdf)
     assert len(images) == 2
     assert all(i.startswith(b"\xff\xd8") for i in images)  # JPEG

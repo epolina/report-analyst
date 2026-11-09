@@ -191,7 +191,7 @@ function ReportPane({
       title={`${report.company_name} ${report.reporting_year}`}
       subtitle={
         <>
-          {statusBadge(report)} · {report.pages} pages
+          {statusBadge(report)} · {report.page_count} pages
         </>
       }
       back={{ label: "All reports", onClick: onBack }}

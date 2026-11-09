@@ -1,8 +1,8 @@
 """One-off: rename the old field names in stored reports and Conversations.
 
-The API and the stored JSON now use `company_name` and `reporting_year` everywhere. Files written
-before that still say `year` (report metadata, chat Evidence) and `company` (chat scope), and no
-longer load. Run this once, with the app stopped, from `backend/`:
+The API and the stored JSON now use `company_name`, `reporting_year` and `page_count`. Files
+written before that still say `year` (report metadata, chat Evidence), `company` (chat scope) and
+`pages` (report metadata), and no longer load. Run this once, with the app stopped, from `backend/`:
 
     uv run python scripts/migrate_field_names.py [DATA_DIR]
 
@@ -25,7 +25,8 @@ def _rename(obj: dict[str, Any], old: str, new: str) -> bool:
 
 
 def _migrate_report(metadata: dict[str, Any]) -> bool:
-    return _rename(metadata, "year", "reporting_year")
+    # `|`, not `or`: both renames must run.
+    return _rename(metadata, "year", "reporting_year") | _rename(metadata, "pages", "page_count")
 
 
 def _migrate_conversation(conversation: dict[str, Any]) -> bool:

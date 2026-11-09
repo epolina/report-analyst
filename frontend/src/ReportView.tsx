@@ -80,11 +80,11 @@ export function ReportView({
     <Split
       left={factsColumn}
       right={
-        report.pages > 0 && (
+        report.page_count > 0 && (
           <PageViewer
             title={`${report.company_name} · Annual report ${report.reporting_year}`}
             page={page}
-            pageCount={report.pages}
+            pageCount={report.page_count}
             src={pageImageUrl(report.report_id, page)}
             boxes={onEvidencePage ? shownEvidence.boxes : []}
             hint={hint}

@@ -8,7 +8,7 @@ const REPORT = {
   company_name: "Shell",
   reporting_year: 2024,
   sha256: "abc",
-  pages: 1,
+  page_count: 1,
   status: "success",
   failure: null,
 };

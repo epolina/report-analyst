@@ -131,7 +131,7 @@ def test_scope_comes_from_the_question_then_the_ui() -> None:
             company_name=c,
             reporting_year=y,
             sha256="x",
-            pages=1,
+            page_count=1,
             status=ReportStatus.SUCCESS,
         )
         for i, (c, y) in enumerate([("Shell", 2024), ("Shell", 2025), ("ABN AMRO", 2025)])
@@ -197,7 +197,7 @@ def test_citations_become_evidence_once_and_none_is_not_found() -> None:
         company_name="Shell",
         reporting_year=2024,
         sha256="abc",
-        pages=9,
+        page_count=9,
         status=ReportStatus.SUCCESS,
     )
     blocks = [Block(page=7, kind=BlockKind.TEXT, text=SPEND_SENTENCE, box=WHOLE_PAGE)]

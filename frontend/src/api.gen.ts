@@ -134,7 +134,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/reports/{report_id}/pages/{number}": {
+    "/reports/{report_id}/pages/{page_number}": {
         parameters: {
             query?: never;
             header?: never;
@@ -147,7 +147,7 @@ export interface paths {
          *
          *     Args:
          *         report_id: The report's id.
-         *         number: The page number, starting at 1.
+         *         page_number: The page number, starting at 1.
          *         repository: Where the page images are stored.
          *
          *     Returns:
@@ -156,7 +156,7 @@ export interface paths {
          *     Raises:
          *         ApiError: 404 `page_not_found`, also for an unknown report.
          */
-        get: operations["get_page_reports__report_id__pages__number__get"];
+        get: operations["get_page_reports__report_id__pages__page_number__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -406,13 +406,13 @@ export interface components {
             boxes: components["schemas"]["PageBox"][];
         };
         /**
-         * ExistingOut
+         * ExistingReportOut
          * @description An error about a stored report: a duplicate, or one still processing. Nothing was saved.
          *
          *     Attributes:
          *         existing: The stored report.
          */
-        ExistingOut: {
+        ExistingReportOut: {
             code: components["schemas"]["ErrorCode"];
             existing: components["schemas"]["Report"];
         };
@@ -483,7 +483,7 @@ export interface components {
          *         company_name: The Company, spelled as it was first entered for any report.
          *         reporting_year: The Reporting Year.
          *         sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.
-         *         pages: The number of pages.
+         *         page_count: The number of pages.
          *         status: Where it is in processing.
          *         failure: Why processing failed; None unless `status` is failed.
          */
@@ -499,8 +499,8 @@ export interface components {
             reporting_year: number;
             /** Sha256 */
             sha256: string;
-            /** Pages */
-            pages: number;
+            /** Page Count */
+            page_count: number;
             status: components["schemas"]["ReportStatus"];
             failure?: components["schemas"]["ReportFailure"] | null;
         };
@@ -524,8 +524,8 @@ export interface components {
             reporting_year: number;
             /** Sha256 */
             sha256: string;
-            /** Pages */
-            pages: number;
+            /** Page Count */
+            page_count: number;
             status: components["schemas"]["ReportStatus"];
             failure?: components["schemas"]["ReportFailure"] | null;
             fte: components["schemas"]["Fte"] | null;
@@ -655,7 +655,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExistingOut"];
+                    "application/json": components["schemas"]["ExistingReportOut"];
                 };
             };
             /** @description Content Too Large */
@@ -796,13 +796,13 @@ export interface operations {
             };
         };
     };
-    get_page_reports__report_id__pages__number__get: {
+    get_page_reports__report_id__pages__page_number__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 report_id: string;
-                number: number;
+                page_number: number;
             };
             cookie?: never;
         };

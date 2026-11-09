@@ -12,7 +12,7 @@ from uuid import UUID
 from report_analyst.domain import OnDuplicate, Report, ReportFailure, ReportStatus
 from report_analyst.facts import FactExtractor
 from report_analyst.llm import LLMError
-from report_analyst.pdf import ExtractionError, PdfExtractor, page_count, render_pages
+from report_analyst.pdf import ExtractionError, PdfExtractor, count_pages, render_pages
 from report_analyst.reports.errors import (
     NotAPdfError,
     NotFailedError,
@@ -116,7 +116,7 @@ class ReportService:
         if should_replace and existing and existing.is_processing:
             raise StillProcessingError(existing)
         try:
-            pages = page_count(content)
+            page_count = count_pages(content)
         except ExtractionError as error:
             raise UnreadablePdfError from error
         report = self._repository.create(
@@ -125,7 +125,7 @@ class ReportService:
             else company_name,
             reporting_year=reporting_year,
             content=content,
-            pages=pages,
+            page_count=page_count,
             original_filename=original_filename,
             report_id=existing.report_id if should_replace and existing else None,
         )
@@ -161,7 +161,7 @@ class ReportService:
                 passages = split_into_passages(self._pdf_extractor.extract(pdf))
             with _log_duration(report, f"embedding {len(passages)} passages"):
                 embeddings = self._retriever.embed(passages)
-            with _log_duration(report, f"rendering {report.pages} pages"):
+            with _log_duration(report, f"rendering {report.page_count} pages"):
                 images = render_pages(pdf)
             with _log_duration(report, "saving"):
                 self._repository.save_contents(report_id, images, passages, embeddings)

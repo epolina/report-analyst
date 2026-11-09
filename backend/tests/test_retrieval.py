@@ -95,7 +95,7 @@ def test_tokenize_makes_plurals_singular() -> None:
 def test_search_sees_passages_saved_again(tmp_path: Path) -> None:
     # A retry saves new Passages for the same PDF; the cached index must not keep the old ones.
     repository = ReportRepository(tmp_path)
-    report = repository.create("Shell", 2024, b"%PDF-", pages=1, original_filename=None)
+    report = repository.create("Shell", 2024, b"%PDF-", page_count=1, original_filename=None)
     retriever = Retriever(repository, FakeEmbedder())
 
     def save(text: str) -> None:

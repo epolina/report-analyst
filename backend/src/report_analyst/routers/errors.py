@@ -40,7 +40,7 @@ class ErrorOut(BaseModel):
     code: ErrorCode
 
 
-class ExistingOut(ErrorOut):
+class ExistingReportOut(ErrorOut):
     """An error about a stored report: a duplicate, or one still processing. Nothing was saved.
 
     Attributes:

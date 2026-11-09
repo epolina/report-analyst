@@ -30,7 +30,7 @@ def test_upload_stores_pdf_and_metadata(client: TestClient, settings: AppSetting
         "company_name": "Shell",
         "reporting_year": 2024,
         "sha256": hashlib.sha256(SHELL_PDF).hexdigest(),
-        "pages": 1,
+        "page_count": 1,
         "status": "processing",
         "failure": None,
     }
