@@ -23,8 +23,8 @@
 
 ```jsonc
 // POST /uploads  (multipart/form-data)
-//   file: PDF, company: "Shell", reporting_year: 2024, on_duplicate?: "replace" | "keep_both"
-// → 202 Report {report_id, company_name, year, sha256, pages, status: "processing", failure: null}
+//   file: PDF, company_name: "Shell", reporting_year: 2024, on_duplicate?: "replace" | "keep_both"
+// → 202 Report {report_id, company_name, reporting_year, sha256, pages, status: "processing", failure: null}
 // Stores REPORTS_DIR/<report_id>/upload.pdf + metadata.json and queues the report. metadata.json
 // also keeps original_filename, for reference only; it isn't returned. A replaced report loses
 // its old content here; if the new PDF then fails, the report shows failed and can be retried.
@@ -35,13 +35,13 @@
 //   "same_company_year": a stored report has the same Company (any case) + year. The client
 //     asks "Replace it?" and sends the upload again with on_duplicate=replace (overwrite, keep
 //     report_id) or keep_both (new report_id).
-//   422  company or reporting_year missing/invalid (FastAPI's own {detail: [...]})
+//   422  company_name or reporting_year missing/invalid (FastAPI's own {detail: [...]})
 //   422  {code: "unreadable_pdf"}: pdfium can't open it; a replaced report stays as it was
 //   415  {code: "not_a_pdf"} (%PDF- magic bytes)
 //   413  TooLargeOut {code: "file_too_large", max_upload_mb} (MAX_UPLOAD_MB, default 100)
 
 // Report  (GET /reports returns Report[])
-{ "report_id": "<uuid>", "company_name": "Shell", "year": 2024, "sha256": "...", "pages": 412,
+{ "report_id": "<uuid>", "company_name": "Shell", "reporting_year": 2024, "sha256": "...", "pages": 412,
   "status": "processing" | "success" | "failed",
   "failure": null }   // when failed: "unreadable_pdf" | "facts_failed" | "interrupted" | "unexpected"
 // Background processing: processing (Mistral OCR, page images, embeddings, then facts with Claude)
@@ -64,12 +64,12 @@
 // POST /chat
 { "conversation_id": null,                           // null starts a new one
   "question": "How much did Shell spend on climate change adaptation in 2025?",
-  "scope": { "company": null, "reporting_year": null } }   // the selects; null = any
+  "scope": { "company_name": null, "reporting_year": null } }   // the selects; null = any
 // A Company or year named in the question (only stored ones) wins over the selects.
 // → 200 ChatReply
 { "conversation_id": "<uuid>",
   "question": "...",
-  "scope": { "company": "Shell", "reporting_year": 2025 },  // what was searched; shown in the UI
+  "scope": { "company_name": "Shell", "reporting_year": 2025 },  // what was searched; shown in the UI
   "answer": Answer }
 
 // Answer
@@ -78,7 +78,7 @@
   "reason": "not_in_report" | "report_not_ready" | "no_report" }
 
 // ChatEvidence: Evidence plus its report, since one Question can search several
-{ "report_id": "<uuid>", "company_name": "Shell", "year": 2025, "page": 57,
+{ "report_id": "<uuid>", "company_name": "Shell", "reporting_year": 2025, "page": 57,
   "quote": "<verbatim>", "boxes": [PageBox] }
 
 // GET /conversations/{id} → 200 { "conversation_id": "<uuid>", "turns": [{question, scope, answer}] }

@@ -71,7 +71,7 @@ export function ReportView({ report, focus, onAsk }: { report: ReportDetail; foc
       right={
         report.pages > 0 && (
           <PageViewer
-            title={`${report.company_name} · Annual report ${report.year}`}
+            title={`${report.company_name} · Annual report ${report.reporting_year}`}
             page={page}
             pageCount={report.pages}
             src={pageImageUrl(report.report_id, page)}

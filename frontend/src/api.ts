@@ -49,7 +49,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 export function uploadReport(file: File, company: string, reportingYear: number, onDuplicate?: OnDuplicate) {
   const form = new FormData();
   form.append("file", file);
-  form.append("company", company);
+  form.append("company_name", company);
   form.append("reporting_year", String(reportingYear));
   if (onDuplicate) form.append("on_duplicate", onDuplicate);
   return call<Report>("/uploads", { method: "POST", body: form });

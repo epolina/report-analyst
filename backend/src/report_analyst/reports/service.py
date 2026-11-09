@@ -66,7 +66,7 @@ class ReportService:
     def add(
         self,
         company_name: str,
-        year: int,
+        reporting_year: int,
         content: bytes,
         original_filename: str | None,
         on_duplicate: OnDuplicate | None,
@@ -79,7 +79,7 @@ class ReportService:
 
         Args:
             company_name: The Company, as entered by the user.
-            year: The Reporting Year.
+            reporting_year: The Reporting Year.
             content: The PDF bytes.
             original_filename: The uploaded file's name, kept in the metadata for reference.
             on_duplicate: What to do when a report for this Company and Reporting Year is
@@ -105,7 +105,7 @@ class ReportService:
             raise SameFileError(same_file)
         # A Company keeps the spelling it was first entered with: "shell" is stored as "Shell".
         same_company = [r for r in reports if r.company_name.casefold() == company_name.casefold()]
-        existing = next((r for r in same_company if r.year == year), None)
+        existing = next((r for r in same_company if r.reporting_year == reporting_year), None)
         if existing and on_duplicate is None:
             raise SameCompanyYearError(existing)
         replace = existing is not None and on_duplicate is OnDuplicate.REPLACE
@@ -117,7 +117,7 @@ class ReportService:
             raise UnreadablePdfError from error
         report = self._repository.create(
             company_name=same_company[0].company_name if same_company else company_name,
-            year=year,
+            reporting_year=reporting_year,
             content=content,
             pages=pages,
             original_filename=original_filename,
@@ -190,7 +190,7 @@ def _timed(report: Report, step: str) -> Iterator[None]:
 
 
 def _label(report: Report) -> str:
-    return f"{report.company_name} {report.year} ({report.report_id})"
+    return f"{report.company_name} {report.reporting_year} ({report.report_id})"
 
 
 def fail_interrupted(repository: ReportRepository) -> None:

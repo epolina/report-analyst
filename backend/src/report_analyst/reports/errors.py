@@ -24,7 +24,7 @@ class DuplicateError(Exception):
         Args:
             existing: The stored report the upload duplicates.
         """
-        super().__init__(f"{existing.company_name} {existing.year}")
+        super().__init__(f"{existing.company_name} {existing.reporting_year}")
         self.existing = existing
 
 

@@ -6,7 +6,7 @@ import App from "./App";
 const REPORT = {
   report_id: "r1",
   company_name: "Shell",
-  year: 2024,
+  reporting_year: 2024,
   sha256: "abc",
   pages: 1,
   status: "success",
@@ -15,7 +15,7 @@ const REPORT = {
 const REPLY = {
   conversation_id: "c1",
   question: "How many FTE?",
-  scope: { company: "Shell", reporting_year: 2024 },
+  scope: { company_name: "Shell", reporting_year: 2024 },
   answer: {
     kind: "answer",
     text: "Shell had 12,345 FTE.",

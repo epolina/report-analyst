@@ -53,7 +53,7 @@ class Report(BaseModel):
     Attributes:
         report_id: The report's id. Kept when the report is replaced.
         company_name: The Company, spelled as it was first entered for any report.
-        year: The Reporting Year.
+        reporting_year: The Reporting Year.
         sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.
         pages: The number of pages.
         status: Where it is in processing.
@@ -62,7 +62,7 @@ class Report(BaseModel):
 
     report_id: UUID
     company_name: str
-    year: int
+    reporting_year: int
     sha256: str
     pages: int
     status: ReportStatus

@@ -78,7 +78,7 @@ class FactExtractor:
             return Facts()
         prompt = _PROMPT.format(
             company=report.company_name,
-            year=report.year,
+            year=report.reporting_year,
             passages="\n\n".join(
                 f'<passage id="{i}" page="{p.page}">\n{p.text}\n</passage>'
                 for i, p in passages.items()

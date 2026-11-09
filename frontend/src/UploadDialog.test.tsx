@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { UploadDialog } from "./UploadDialog";
 
-const REPORT = { report_id: "r1", company_name: "Shell", year: 2024, sha256: "abc", status: "processing" };
+const REPORT = { report_id: "r1", company_name: "Shell", reporting_year: 2024, sha256: "abc", status: "processing" };
 const DUPLICATE = { code: "same_company_year", existing: REPORT };
 const SAME_FILE = { code: "same_file", existing: REPORT };
 
@@ -59,7 +59,7 @@ test("a new report is sent trimmed and handed to onUploaded", async () => {
   const onUploaded = fillAndSubmit();
 
   await waitFor(() => expect(onUploaded).toHaveBeenCalledWith(REPORT));
-  expect(sent(fetch, 0)).toMatchObject({ company: "Shell", reporting_year: "2024" });
+  expect(sent(fetch, 0)).toMatchObject({ company_name: "Shell", reporting_year: "2024" });
   expect(sent(fetch, 0)).not.toHaveProperty("on_duplicate");
 });
 

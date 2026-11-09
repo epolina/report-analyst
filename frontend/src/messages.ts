@@ -8,7 +8,7 @@ type Report = Schemas["Report"];
 export type ErrorBody = Schemas["ErrorOut"] & Partial<Schemas["ExistingOut"] & Schemas["TooLargeOut"]>;
 
 const UNREADABLE_PDF = "The PDF couldn't be read. Is it damaged?";
-const label = (r: Report) => `${r.company_name} ${r.year}`;
+const label = (r: Report) => `${r.company_name} ${r.reporting_year}`;
 
 export const ERROR: Record<Schemas["ErrorCode"], (e: ErrorBody) => string> = {
   report_not_found: () => "There's no such report.",

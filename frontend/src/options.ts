@@ -7,4 +7,4 @@ export const ADD_REPORT = "Add a report PDF";
 
 export const unique = <T>(xs: T[]) => [...new Set(xs)];
 export const companiesOf = (reports: Report[]) => unique(reports.map((r) => r.company_name)).sort();
-export const yearsOf = (reports: Report[]) => unique(reports.map((r) => r.year)).sort((a, b) => b - a);
+export const yearsOf = (reports: Report[]) => unique(reports.map((r) => r.reporting_year)).sort((a, b) => b - a);

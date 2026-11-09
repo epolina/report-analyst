@@ -13,7 +13,7 @@ from conftest import HeldJobs, one_page_pdf, upload
 PDF = one_page_pdf("Total FTEs: 44,209")
 NEWER = one_page_pdf("Total FTEs: 44,210")
 BROKEN = b"%PDF-1.7\nthe rest is missing"
-FORM = {"company": "Shell", "reporting_year": "2024"}
+FORM = {"company_name": "Shell", "reporting_year": "2024"}
 
 
 def stored_ids(settings: AppSettings) -> list[str]:
@@ -28,7 +28,7 @@ def test_upload_stores_pdf_and_metadata(client: TestClient, settings: AppSetting
     report_id = body.pop("report_id")
     assert body == {
         "company_name": "Shell",
-        "year": 2024,
+        "reporting_year": 2024,
         "sha256": hashlib.sha256(PDF).hexdigest(),
         "pages": 1,
         "status": "processing",
@@ -54,8 +54,8 @@ def test_failed_replace_keeps_the_stored_report(client: TestClient, settings: Ap
 @pytest.mark.parametrize(
     ("content", "form", "code"),
     [
-        (PDF, {"company": "Shell", "reporting_year": "2025"}, "same_file"),  # other year
-        (NEWER, {"company": "shell"}, "same_company_year"),  # Company in any case
+        (PDF, {"company_name": "Shell", "reporting_year": "2025"}, "same_file"),  # other year
+        (NEWER, {"company_name": "shell"}, "same_company_year"),  # Company in any case
     ],
 )
 def test_duplicate_asks_and_saves_nothing(
@@ -87,7 +87,7 @@ def test_same_file_is_refused_whatever_the_choice(
 def test_duplicate_replace_keeps_id(client: TestClient, settings: AppSettings) -> None:
     first = upload(client, PDF).json()
 
-    second = upload(client, NEWER, company="shell", on_duplicate="replace").json()
+    second = upload(client, NEWER, company_name="shell", on_duplicate="replace").json()
 
     assert second["report_id"] == first["report_id"]
     assert second["company_name"] == "Shell"  # first spelling kept
@@ -123,9 +123,9 @@ def test_duplicate_keep_both_creates_new_id(client: TestClient, settings: AppSet
         (b"PK\x03\x04 a zip, not a pdf", FORM, 415),
         (b"", FORM, 415),
         (BROKEN, FORM, 422),  # pdfium can't open it
-        (PDF, {"company": "  ", "reporting_year": "2024"}, 422),
-        (PDF, {"company": "Shell", "reporting_year": "24"}, 422),
-        (PDF, {"company": "Shell"}, 422),
+        (PDF, {"company_name": "  ", "reporting_year": "2024"}, 422),
+        (PDF, {"company_name": "Shell", "reporting_year": "24"}, 422),
+        (PDF, {"company_name": "Shell"}, 422),
     ],
 )
 def test_upload_rejects_invalid_and_saves_nothing(

@@ -24,7 +24,7 @@ export interface paths {
          *         settings: The app settings.
          *         service: Stores the report, then extracts its FTE and goals.
          *         file: The annual report PDF.
-         *         company: The Company the report belongs to, as entered by the user.
+         *         company_name: The Company the report belongs to, as entered by the user.
          *         reporting_year: The Reporting Year the report covers.
          *         on_duplicate: What to do when a report for this Company and year is stored; None asks
          *             first with a 409 `same_company_year`.
@@ -284,8 +284,8 @@ export interface components {
         Body_upload_uploads_post: {
             /** File */
             file: string;
-            /** Company */
-            company: string;
+            /** Company Name */
+            company_name: string;
             /** Reporting Year */
             reporting_year: number;
             on_duplicate?: components["schemas"]["OnDuplicate"] | null;
@@ -297,7 +297,7 @@ export interface components {
          *     Attributes:
          *         report_id: The report the quote is from.
          *         company_name: Its Company.
-         *         year: Its Reporting Year.
+         *         reporting_year: Its Reporting Year.
          */
         ChatEvidence: {
             /** Page */
@@ -313,8 +313,8 @@ export interface components {
             report_id: string;
             /** Company Name */
             company_name: string;
-            /** Year */
-            year: number;
+            /** Reporting Year */
+            reporting_year: number;
         };
         /**
          * ChatReply
@@ -481,7 +481,7 @@ export interface components {
          *     Attributes:
          *         report_id: The report's id. Kept when the report is replaced.
          *         company_name: The Company, spelled as it was first entered for any report.
-         *         year: The Reporting Year.
+         *         reporting_year: The Reporting Year.
          *         sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.
          *         pages: The number of pages.
          *         status: Where it is in processing.
@@ -495,8 +495,8 @@ export interface components {
             report_id: string;
             /** Company Name */
             company_name: string;
-            /** Year */
-            year: number;
+            /** Reporting Year */
+            reporting_year: number;
             /** Sha256 */
             sha256: string;
             /** Pages */
@@ -520,8 +520,8 @@ export interface components {
             report_id: string;
             /** Company Name */
             company_name: string;
-            /** Year */
-            year: number;
+            /** Reporting Year */
+            reporting_year: number;
             /** Sha256 */
             sha256: string;
             /** Pages */
@@ -549,12 +549,12 @@ export interface components {
          * @description Which reports a Question searches. None means any.
          *
          *     Attributes:
-         *         company: The Company.
+         *         company_name: The Company.
          *         reporting_year: The Reporting Year.
          */
         Scope: {
-            /** Company */
-            company?: string | null;
+            /** Company Name */
+            company_name?: string | null;
             /** Reporting Year */
             reporting_year?: number | null;
         };

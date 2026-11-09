@@ -61,7 +61,7 @@ class ReportRepository:
     def create(
         self,
         company_name: str,
-        year: int,
+        reporting_year: int,
         content: bytes,
         pages: int,
         original_filename: str | None,
@@ -73,7 +73,7 @@ class ReportRepository:
 
         Args:
             company_name: The Company, spelled as it is stored.
-            year: The Reporting Year.
+            reporting_year: The Reporting Year.
             content: The PDF bytes.
             pages: The number of pages.
             original_filename: The uploaded file's name, kept in the metadata for reference.
@@ -85,7 +85,7 @@ class ReportRepository:
         stored = _StoredReport(
             report_id=report_id or uuid4(),
             company_name=company_name,
-            year=year,
+            reporting_year=reporting_year,
             sha256=_sha256(content),
             pages=pages,
             status=ReportStatus.PROCESSING,
@@ -264,4 +264,4 @@ class ReportRepository:
             Report.model_validate_json(p.read_bytes())
             for p in self._dir.glob(f"*/{_METADATA_FILE}")
         ]
-        return sorted(reports, key=lambda r: (r.company_name.casefold(), r.year))
+        return sorted(reports, key=lambda r: (r.company_name.casefold(), r.reporting_year))

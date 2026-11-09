@@ -28,15 +28,15 @@ def test_answers_with_evidence_from_the_report_named_in_the_question(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
     shell = upload(client, make_pdf(SPEND)).json()["report_id"]
-    upload(client, make_pdf("Heineken brewed beer."), company="Heineken")
+    upload(client, make_pdf("Heineken brewed beer."), company_name="Heineken")
     fake_llm.cited = answer()
 
     reply = ask(client, "How much did SHELL spend on climate adaptation in 2024?")
 
-    assert reply["scope"] == {"company": "Shell", "reporting_year": 2024}
+    assert reply["scope"] == {"company_name": "Shell", "reporting_year": 2024}
     assert reply["answer"]["kind"] == "answer"
     [evidence] = reply["answer"]["evidence"]
-    assert (evidence["report_id"], evidence["company_name"], evidence["year"]) == (
+    assert (evidence["report_id"], evidence["company_name"], evidence["reporting_year"]) == (
         shell,
         "Shell",
         2024,
@@ -101,7 +101,9 @@ def test_no_report_in_scope_is_not_found_without_asking_the_model(
     upload(client, make_pdf(SPEND))
     prompts = len(fake_llm.prompts)
 
-    reply = ask(client, "What was the FTE?", scope={"company": "Shell", "reporting_year": 2023})
+    reply = ask(
+        client, "What was the FTE?", scope={"company_name": "Shell", "reporting_year": 2023}
+    )
 
     assert reply["answer"]["reason"] == "no_report"
     assert reply["answer"]["text"] == ""  # the UI words it from the reason
@@ -127,18 +129,18 @@ def test_scope_comes_from_the_question_then_the_ui() -> None:
         Report(
             report_id="00000000-0000-0000-0000-00000000000" + str(i),
             company_name=c,
-            year=y,
+            reporting_year=y,
             sha256="x",
             pages=1,
             status=ReportStatus.SUCCESS,
         )
         for i, (c, y) in enumerate([("Shell", 2024), ("Shell", 2025), ("ABN AMRO", 2025)])
     ]
-    ui = Scope(company="Shell", reporting_year=2024)
+    ui = Scope(company_name="Shell", reporting_year=2024)
 
     def scope(question: str) -> tuple:
         s = resolve_scope(question, ui, reports)
-        return s.company, s.reporting_year
+        return s.company_name, s.reporting_year
 
     assert scope("What is the FTE?") == ("Shell", 2024)  # nothing named: the UI's
     assert scope("FTE of abn amro in 2025?") == ("ABN AMRO", 2025)  # named: the question's
@@ -193,7 +195,7 @@ def test_citations_become_evidence_once_and_none_is_not_found() -> None:
     report = Report(
         report_id=uuid4(),
         company_name="Shell",
-        year=2024,
+        reporting_year=2024,
         sha256="abc",
         pages=9,
         status=ReportStatus.SUCCESS,
@@ -213,7 +215,7 @@ def test_citations_become_evidence_once_and_none_is_not_found() -> None:
         SPEND,
         [WHOLE_PAGE],
     )
-    assert (evidence.report_id, evidence.company_name, evidence.year) == (
+    assert (evidence.report_id, evidence.company_name, evidence.reporting_year) == (
         report.report_id,
         "Shell",
         2024,

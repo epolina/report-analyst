@@ -44,8 +44,8 @@ function groupByCompany(reports: Report[]): TableGroup[] {
       label: company,
       rows: reports
         .filter((r) => r.company_name === company)
-        .sort((a, b) => b.year - a.year)
-        .map((r) => ({ key: r.report_id, cells: [r.year, statusOf(r)] })),
+        .sort((a, b) => b.reporting_year - a.reporting_year)
+        .map((r) => ({ key: r.report_id, cells: [r.reporting_year, statusOf(r)] })),
     }));
 }
 
@@ -54,7 +54,7 @@ function BusyNote({ report }: { report?: Report }) {
   return (
     report && (
       <EmptyText>
-        One report at a time: {report.company_name} {report.year} is processing.
+        One report at a time: {report.company_name} {report.reporting_year} is processing.
       </EmptyText>
     )
   );
@@ -99,7 +99,7 @@ export function ReportsDrawer({
   }
 
   const groups = groupByCompany(
-    reports.filter((r) => (!company || r.company_name === company) && (!year || String(r.year) === year)),
+    reports.filter((r) => (!company || r.company_name === company) && (!year || String(r.reporting_year) === year)),
   );
   return (
     <Pane title="Reports">
@@ -184,7 +184,7 @@ function ReportPane({
 
   return (
     <Pane
-      title={`${report.company_name} ${report.year}`}
+      title={`${report.company_name} ${report.reporting_year}`}
       subtitle={
         <>
           {statusOf(report)} · {report.pages} pages

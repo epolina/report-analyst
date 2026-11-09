@@ -12,11 +12,11 @@ class Scope(BaseModel):
     """Which reports a Question searches. None means any.
 
     Attributes:
-        company: The Company.
+        company_name: The Company.
         reporting_year: The Reporting Year.
     """
 
-    company: str | None = None
+    company_name: str | None = None
     reporting_year: int | None = None
 
 
@@ -26,12 +26,12 @@ class ChatEvidence(Evidence):
     Attributes:
         report_id: The report the quote is from.
         company_name: Its Company.
-        year: Its Reporting Year.
+        reporting_year: Its Reporting Year.
     """
 
     report_id: UUID
     company_name: str
-    year: int
+    reporting_year: int
 
 
 class NotFoundReason(StrEnum):

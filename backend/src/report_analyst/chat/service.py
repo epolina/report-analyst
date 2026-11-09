@@ -149,9 +149,11 @@ def resolve_scope(question: str, scope: Scope, reports: list[Report]) -> Scope:
         for r in reports
         if re.search(rf"\b{re.escape(r.company_name)}\b", question, re.IGNORECASE)
     }
-    years_named = {int(y) for y in _YEAR_PATTERN.findall(question)} & {r.year for r in reports}
+    years_named = {int(y) for y in _YEAR_PATTERN.findall(question)} & {
+        r.reporting_year for r in reports
+    }
     return Scope(
-        company=_scope_field(companies_named, scope.company),
+        company_name=_scope_field(companies_named, scope.company_name),
         reporting_year=_scope_field(years_named, scope.reporting_year),
     )
 
@@ -195,7 +197,8 @@ def _build_prompt(question: str, history: list[Turn]) -> str:
 def _passages_as_documents(found_passages: _ReportPassages) -> list[tuple[str, str | list[str]]]:
     # One document per Passage, titled with its report and page.
     return [
-        (f"{r.company_name} {r.year}, page {p.page}", _document_body(p)) for r, p in found_passages
+        (f"{r.company_name} {r.reporting_year}, page {p.page}", _document_body(p))
+        for r, p in found_passages
     ]
 
 
@@ -214,7 +217,7 @@ def _to_answer(cited_answer: CitedAnswer, found_passages: _ReportPassages) -> An
                 boxes=passage.boxes_of(quote),
                 report_id=report.report_id,
                 company_name=report.company_name,
-                year=report.year,
+                reporting_year=report.reporting_year,
             )
     if not evidence_by_quote:
         return _not_found(NotFoundReason.NOT_IN_REPORT, cited_answer.text)
@@ -223,8 +226,9 @@ def _to_answer(cited_answer: CitedAnswer, found_passages: _ReportPassages) -> An
 
 def _report_in_scope(report: Report, scope: Scope) -> bool:
     return (
-        scope.company is None or report.company_name.casefold() == scope.company.casefold()
-    ) and (scope.reporting_year is None or report.year == scope.reporting_year)
+        scope.company_name is None
+        or report.company_name.casefold() == scope.company_name.casefold()
+    ) and (scope.reporting_year is None or report.reporting_year == scope.reporting_year)
 
 
 def _not_found(reason: NotFoundReason, text: str = "") -> Answer:

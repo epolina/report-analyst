@@ -162,7 +162,7 @@ def upload(client: TestClient, pdf: bytes, **form: str) -> Response:
     return client.post(
         "/uploads",
         files={"file": ("shell-2024.pdf", pdf)},
-        data={"company": "Shell", "reporting_year": "2024", **form},
+        data={"company_name": "Shell", "reporting_year": "2024", **form},
     )
 
 

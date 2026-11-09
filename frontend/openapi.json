@@ -11,7 +11,7 @@
           "uploads"
         ],
         "summary": "Upload",
-        "description": "Add an annual report PDF, asking first about a duplicate, and start processing it.\n\nProcessing runs in the background: poll `GET /reports` until the report's status is success\nor failed. One report is processed at a time; a second one waits its turn.\n\nArgs:\n    settings: The app settings.\n    service: Stores the report, then extracts its FTE and goals.\n    file: The annual report PDF.\n    company: The Company the report belongs to, as entered by the user.\n    reporting_year: The Reporting Year the report covers.\n    on_duplicate: What to do when a report for this Company and year is stored; None asks\n        first with a 409 `same_company_year`.\n\nReturns:\n    The stored report, processing.\n\nRaises:\n    ApiError: 409 `same_file`, `same_company_year` or `still_processing`, naming the stored\n        report; 413 `file_too_large`; 415 `not_a_pdf`; 422 `unreadable_pdf` if pdfium\n        can't open it. Missing or invalid fields get FastAPI's own 422 validation error.",
+        "description": "Add an annual report PDF, asking first about a duplicate, and start processing it.\n\nProcessing runs in the background: poll `GET /reports` until the report's status is success\nor failed. One report is processed at a time; a second one waits its turn.\n\nArgs:\n    settings: The app settings.\n    service: Stores the report, then extracts its FTE and goals.\n    file: The annual report PDF.\n    company_name: The Company the report belongs to, as entered by the user.\n    reporting_year: The Reporting Year the report covers.\n    on_duplicate: What to do when a report for this Company and year is stored; None asks\n        first with a 409 `same_company_year`.\n\nReturns:\n    The stored report, processing.\n\nRaises:\n    ApiError: 409 `same_file`, `same_company_year` or `still_processing`, naming the stored\n        report; 413 `file_too_large`; 415 `not_a_pdf`; 422 `unreadable_pdf` if pdfium\n        can't open it. Missing or invalid fields get FastAPI's own 422 validation error.",
         "operationId": "upload_uploads_post",
         "requestBody": {
           "content": {
@@ -469,10 +469,10 @@
             "contentMediaType": "application/octet-stream",
             "title": "File"
           },
-          "company": {
+          "company_name": {
             "type": "string",
             "minLength": 1,
-            "title": "Company"
+            "title": "Company Name"
           },
           "reporting_year": {
             "type": "integer",
@@ -494,7 +494,7 @@
         "type": "object",
         "required": [
           "file",
-          "company",
+          "company_name",
           "reporting_year"
         ],
         "title": "Body_upload_uploads_post"
@@ -525,9 +525,9 @@
             "type": "string",
             "title": "Company Name"
           },
-          "year": {
+          "reporting_year": {
             "type": "integer",
-            "title": "Year"
+            "title": "Reporting Year"
           }
         },
         "type": "object",
@@ -537,10 +537,10 @@
           "boxes",
           "report_id",
           "company_name",
-          "year"
+          "reporting_year"
         ],
         "title": "ChatEvidence",
-        "description": "Evidence for an Answer, naming its report, since one Question can search several.\n\nAttributes:\n    report_id: The report the quote is from.\n    company_name: Its Company.\n    year: Its Reporting Year."
+        "description": "Evidence for an Answer, naming its report, since one Question can search several.\n\nAttributes:\n    report_id: The report the quote is from.\n    company_name: Its Company.\n    reporting_year: Its Reporting Year."
       },
       "ChatReply": {
         "properties": {
@@ -801,9 +801,9 @@
             "type": "string",
             "title": "Company Name"
           },
-          "year": {
+          "reporting_year": {
             "type": "integer",
-            "title": "Year"
+            "title": "Reporting Year"
           },
           "sha256": {
             "type": "string",
@@ -831,13 +831,13 @@
         "required": [
           "report_id",
           "company_name",
-          "year",
+          "reporting_year",
           "sha256",
           "pages",
           "status"
         ],
         "title": "Report",
-        "description": "One Company's annual report for one Reporting Year.\n\nAttributes:\n    report_id: The report's id. Kept when the report is replaced.\n    company_name: The Company, spelled as it was first entered for any report.\n    year: The Reporting Year.\n    sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.\n    pages: The number of pages.\n    status: Where it is in processing.\n    failure: Why processing failed; None unless `status` is failed."
+        "description": "One Company's annual report for one Reporting Year.\n\nAttributes:\n    report_id: The report's id. Kept when the report is replaced.\n    company_name: The Company, spelled as it was first entered for any report.\n    reporting_year: The Reporting Year.\n    sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.\n    pages: The number of pages.\n    status: Where it is in processing.\n    failure: Why processing failed; None unless `status` is failed."
       },
       "ReportDetail": {
         "properties": {
@@ -850,9 +850,9 @@
             "type": "string",
             "title": "Company Name"
           },
-          "year": {
+          "reporting_year": {
             "type": "integer",
-            "title": "Year"
+            "title": "Reporting Year"
           },
           "sha256": {
             "type": "string",
@@ -897,7 +897,7 @@
         "required": [
           "report_id",
           "company_name",
-          "year",
+          "reporting_year",
           "sha256",
           "pages",
           "status",
@@ -930,7 +930,7 @@
       },
       "Scope": {
         "properties": {
-          "company": {
+          "company_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -939,7 +939,7 @@
                 "type": "null"
               }
             ],
-            "title": "Company"
+            "title": "Company Name"
           },
           "reporting_year": {
             "anyOf": [
@@ -955,7 +955,7 @@
         },
         "type": "object",
         "title": "Scope",
-        "description": "Which reports a Question searches. None means any.\n\nAttributes:\n    company: The Company.\n    reporting_year: The Reporting Year."
+        "description": "Which reports a Question searches. None means any.\n\nAttributes:\n    company_name: The Company.\n    reporting_year: The Reporting Year."
       },
       "SustainabilityGoal": {
         "properties": {

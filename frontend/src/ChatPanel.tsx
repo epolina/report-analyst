@@ -37,8 +37,8 @@ const storage = {
   },
 };
 
-const scopeLabel = (s: Scope) => `${s.company ?? ALL_COMPANIES} · ${s.reporting_year ?? ANY_YEAR}`;
-const sourceLabel = (e: ChatEvidence) => `${e.company_name} annual report ${e.year} · p. ${e.page}`;
+const scopeLabel = (s: Scope) => `${s.company_name ?? ALL_COMPANIES} · ${s.reporting_year ?? ANY_YEAR}`;
+const sourceLabel = (e: ChatEvidence) => `${e.company_name} annual report ${e.reporting_year} · p. ${e.page}`;
 
 export function useChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export function useChat() {
   }, []);
 
   function ask(question: string) {
-    const scope = { company: company || null, reporting_year: year ? Number(year) : null };
+    const scope = { company_name: company || null, reporting_year: year ? Number(year) : null };
     setPending(question);
     setError("");
     setDraft("");
@@ -72,7 +72,7 @@ export function useChat() {
         storage.set(reply.conversation_id);
         setTurns((t) => [...t, reply]);
         // The scope it searched, which the Question may have changed, carries over to the next.
-        setCompany(reply.scope.company ?? "");
+        setCompany(reply.scope.company_name ?? "");
         setYear(reply.scope.reporting_year ? String(reply.scope.reporting_year) : "");
       })
       .catch((e: Error) => {
@@ -90,9 +90,9 @@ export function useChat() {
   }
 
   // Ask about one report next, e.g. from its page in the drawer.
-  function scopeTo(report: { company_name: string; year: number }) {
+  function scopeTo(report: { company_name: string; reporting_year: number }) {
     setCompany(report.company_name);
-    setYear(String(report.year));
+    setYear(String(report.reporting_year));
   }
 
   const busy = pending !== undefined;
@@ -173,8 +173,8 @@ export function ChatThread({
 function suggestionsFor(reports: Report[]) {
   const r = reports.find((x) => x.status === "success") ?? reports[0];
   return [
-    `How much did ${r.company_name} spend on climate change adaptation in ${r.year}?`,
-    `How many FTE did ${r.company_name} have in ${r.year}?`,
+    `How much did ${r.company_name} spend on climate change adaptation in ${r.reporting_year}?`,
+    `How many FTE did ${r.company_name} have in ${r.reporting_year}?`,
     `What are ${r.company_name}'s sustainability goals?`,
   ];
 }
