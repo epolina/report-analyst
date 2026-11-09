@@ -114,3 +114,9 @@ Three different PDF extractors were tried behind one `PdfExtractor` interface.
 | 1. PyMuPDF (pymupdf4llm) | ~1 min / 300 pages, local | Fast, but no positions: we can't highlight the evidence on the page |
 | 2. Docling | Several minutes / 300 pages, local | Good tables and boxes, but slow, memory-hungry (had to process 20 pages at a time) and pulls in PyTorch |
 | 3. Mistral OCR (**default**) | 33 s / 307 pages | Typed blocks (title, text, table) with boxes, headers/footers dropped. Trade-off: the PDF goes to Mistral's API |
+
+## Next steps
+
+1. **Async calls for production.** Today nothing is `async`, on purpose: it's built for one analyst on one machine (see [ARCHITECTURE.md](ARCHITECTURE.md)). With many users, each chat question waiting on Claude holds a thread from FastAPI's pool. Before going to production, move the chat route and the Claude and Mistral clients to their async versions (`async def` routes, `anthropic.AsyncAnthropic`), and replace the in-memory processing queue with a real job queue (arq, RQ) so jobs survive restarts and can run on more workers.
+2. **Evaluate fact extraction.** Measure the recall of the FTE and the Sustainability Goals. Label a set of reports by hand: the FTE figure and every goal, each with its page. Then score what processing extracts against those labels: is the FTE found and correct, and what share of the labelled goals is found (with precision alongside, so a long list of non-goals doesn't look good). Run it whenever the prompt, the search queries or the PDF extractor change.
+3. **Evaluate the chat.** Build a set of Questions with known answers, including some the reports don't answer, and check that each Answer is right, that its Evidence quotes the page that states it, and that the unanswerable ones come back Not Found rather than a guess.
