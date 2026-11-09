@@ -141,6 +141,21 @@ def test_a_company_or_year_not_stored_is_named_without_answering(
     assert len(fake_llm.prompts) == calls + 1  # fields extracted, no answer generated
 
 
+def test_a_company_named_without_a_year_is_answered_from_its_latest_report(
+    client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
+) -> None:
+    add_report(client, make_pdf, fake_llm, "Shell", "2023")
+    latest = add_report(client, make_pdf, fake_llm, "Shell", "2024")
+    fake_llm.answers[FilteringFields] = {
+        "fact": "fte",
+        "company_year_pairs": [{"company_name": "Shell", "reporting_year": None}],
+    }
+
+    reply = ask(client, "How many FTE does Shell have?")
+
+    assert [r["report_id"] for r in reply["reports"]] == [latest]
+
+
 def test_a_question_about_anything_else_is_not_supported(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:

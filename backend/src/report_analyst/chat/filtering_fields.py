@@ -28,9 +28,10 @@ Read from the question:
 {fact_kinds}
 2. company_year_pairs: each Company and Reporting Year it asks about. Write the Company as it
    is stored above when the question clearly means it, by a short form or another spelling
-   ("ABN" is "ABN AMRO"); otherwise as the question writes it. A Company named without a year
-   means its latest stored year. A follow-up such as "and in 2025?" keeps the Company of the
-   earlier questions. If no Company is named here or earlier, leave the list empty."""
+   ("ABN" is "ABN AMRO"); otherwise as the question writes it. Give the year only if the
+   question, or an earlier one for a follow-up, names it; otherwise leave it null. A follow-up
+   such as "and in 2025?" keeps the Company of the earlier questions. If no Company is named
+   here or earlier, leave the list empty."""
 
 
 class FactKind(StrEnum):
@@ -63,10 +64,22 @@ class FactKind(StrEnum):
 
 
 class CompanyYearPair(BaseModel):
-    """A Company and Reporting Year the Question asks about."""
+    """A Company, and the Reporting Year if the Question names one, that the Question asks about."""
 
     company_name: str = Field(description="The Company, as stored when it is a stored one.")
-    reporting_year: int = Field(description="The Reporting Year.")
+    reporting_year: int | None = Field(
+        default=None, description="The Reporting Year; null if the question names none."
+    )
+
+    def as_string(self) -> str:
+        """Name the pair as the user would, e.g. "ABN AMRO 2023", or "Heineken" with no year.
+
+        Returns:
+            The Company, then the year if there is one.
+        """
+        if self.reporting_year is None:
+            return self.company_name
+        return f"{self.company_name} {self.reporting_year}"
 
 
 class FilteringFields(BaseModel):

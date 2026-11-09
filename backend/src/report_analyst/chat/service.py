@@ -134,7 +134,7 @@ class ChatService:
         # 2. The stored reports for those pairs, and their Facts of that kind.
         found = find_reports(filtering_fields.company_year_pairs, stored_reports)
         if found.missing_pairs:
-            missing = [f"{p.company_name} {p.reporting_year}" for p in found.missing_pairs]
+            missing = [pair.as_string() for pair in found.missing_pairs]
             raise QuestionNotAnsweredError(
                 NotFoundReason.NO_MATCHING_REPORT, missing=missing, reports=found.reports
             )

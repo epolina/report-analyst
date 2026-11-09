@@ -41,6 +41,8 @@ def find_reports(
 ) -> ReportsFound:
     """Find the stored reports for each Company and year pair.
 
+    A pair without a year means the Company's latest stored year.
+
     Args:
         company_year_pairs: The pairs the Question asks about.
         stored_reports: Every stored report.
@@ -51,7 +53,7 @@ def find_reports(
     reports: list[Report] = []
     missing_pairs = []
     for pair in company_year_pairs:
-        reports_for_pair = [r for r in stored_reports if _report_matches_pair(r, pair)]
+        reports_for_pair = _reports_for_pair(pair, stored_reports)
         if not reports_for_pair:
             missing_pairs.append(pair)
         reports += [r for r in reports_for_pair if r not in reports]
@@ -78,9 +80,13 @@ def collect_relevant_facts(
     return relevant_facts
 
 
-def _report_matches_pair(report: Report, pair: CompanyYearPair) -> bool:
-    # The same Company (ignoring case) and the same Reporting Year.
-    return (
-        report.company_name.casefold() == pair.company_name.casefold()
-        and report.reporting_year == pair.reporting_year
-    )
+def _reports_for_pair(pair: CompanyYearPair, stored_reports: list[Report]) -> list[Report]:
+    # The same Company (ignoring case), and the year asked or else its latest one. Usually one
+    # report; more if the user kept both of two uploads for the same Company and year.
+    company_reports = [
+        r for r in stored_reports if r.company_name.casefold() == pair.company_name.casefold()
+    ]
+    if not company_reports:
+        return []
+    year = pair.reporting_year or max(r.reporting_year for r in company_reports)
+    return [r for r in company_reports if r.reporting_year == year]
