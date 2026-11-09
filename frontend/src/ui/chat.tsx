@@ -4,18 +4,18 @@ import { Button } from "./controls";
 import { ICONS } from "./icons";
 import "./chat.css";
 
-// The Questions and Answers, oldest first. Scrolls to the newest when `size` (how many messages
-// there are) grows, not on every render. Announced politely as answers arrive.
-export function Thread({ size, children }: { size: number; children: ReactNode }) {
-  const end = useRef<HTMLDivElement>(null);
+// The Questions and Answers, oldest first. Scrolls to the newest when `messageCount` grows, not
+// on every render. Announced politely as answers arrive.
+export function Thread({ messageCount, children }: { messageCount: number; children: ReactNode }) {
+  const endRef = useRef<HTMLDivElement>(null);
   // Braces: an effect's return value is its clean-up, and scrollIntoView may return a Promise.
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "end" });
-  }, [size]);
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [messageCount]);
   return (
     <div className="ui-thread" aria-live="polite">
       {children}
-      <div ref={end} />
+      <div ref={endRef} />
     </div>
   );
 }
@@ -37,9 +37,9 @@ export function ChatStart({
       <h2>{title}</h2>
       <p>{hint}</p>
       <div className="ui-chips">
-        {suggestions.map((s) => (
-          <button key={s} type="button" className="ui-chip" onClick={() => onPick(s)}>
-            {s}
+        {suggestions.map((suggestion) => (
+          <button key={suggestion} type="button" className="ui-chip" onClick={() => onPick(suggestion)}>
+            {suggestion}
           </button>
         ))}
       </div>

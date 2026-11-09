@@ -8,32 +8,32 @@ type Report = Schemas["Report"];
 export type ErrorBody = Schemas["ErrorOut"] & Partial<Schemas["ExistingOut"] & Schemas["TooLargeOut"]>;
 
 const UNREADABLE_PDF = "The PDF couldn't be read. Is it damaged?";
-const label = (r: Report) => `${r.company_name} ${r.reporting_year}`;
+const reportLabel = (r: Report) => `${r.company_name} ${r.reporting_year}`;
 
-export const ERROR: Record<Schemas["ErrorCode"], (e: ErrorBody) => string> = {
+export const ERROR_MESSAGES: Record<Schemas["ErrorCode"], (body: ErrorBody) => string> = {
   report_not_found: () => "There's no such report.",
   page_not_found: () => "There's no such page.",
   conversation_not_found: () => "There's no such conversation.",
   not_failed: () => "Only a failed report can be retried.",
   answer_failed: () => "Couldn't answer just now. Try again.",
-  file_too_large: (e) => `The file is larger than ${e.max_upload_mb} MB.`,
+  file_too_large: (body) => `The file is larger than ${body.max_upload_mb} MB.`,
   not_a_pdf: () => "The file isn't a PDF.",
   unreadable_pdf: () => UNREADABLE_PDF,
-  still_processing: (e) => `${label(e.existing!)} is still processing. Replace it once it's ready.`,
-  same_file: (e) => `You've already uploaded this document as ${label(e.existing!)}.`,
-  same_company_year: (e) => `There's already a report for ${label(e.existing!)}.`,
+  still_processing: (body) => `${reportLabel(body.existing!)} is still processing. Replace it once it's ready.`,
+  same_file: (body) => `You've already uploaded this document as ${reportLabel(body.existing!)}.`,
+  same_company_year: (body) => `There's already a report for ${reportLabel(body.existing!)}.`,
 };
 
-export const FAILURE: Record<Schemas["ReportFailure"], string> = {
+export const FAILURE_MESSAGES: Record<Schemas["ReportFailure"], string> = {
   unreadable_pdf: UNREADABLE_PDF,
   facts_failed: "Couldn't extract the FTE and goals.",
   interrupted: "Processing was interrupted.",
   unexpected: "Something went wrong while processing the report.",
 };
 
-export const failureMessage = (r: Report) => (r.failure ? FAILURE[r.failure] : "Processing failed.");
+export const failureMessage = (r: Report) => (r.failure ? FAILURE_MESSAGES[r.failure] : "Processing failed.");
 
-export const NOT_FOUND: Record<Schemas["NotFoundReason"], { title: string; note?: string }> = {
+export const NOT_FOUND_MESSAGES: Record<Schemas["NotFoundReason"], { title: string; note?: string }> = {
   not_in_report: { title: "No matching passage" },
   report_not_ready: { title: "Report not searched", note: "Ask again once the report is Ready." },
   no_report: { title: "No report searched", note: "Add that report, or change the Company or year below." },

@@ -5,7 +5,7 @@ import "./list.css";
 
 type Tone = "ok" | "busy" | "bad";
 
-type TabProps = Omit<ComponentProps<"button">, "className" | "type"> & {
+type TopBarButtonProps = Omit<ComponentProps<"button">, "className" | "type"> & {
   pressed?: boolean;
   count?: number;
   dot?: { tone: Tone; label: string };
@@ -13,7 +13,7 @@ type TabProps = Omit<ComponentProps<"button">, "className" | "type"> & {
 
 // A quiet top-bar button. With `pressed` it toggles something (the drawer) and shows it's on.
 // `dot` flags something worth a look inside, e.g. a failed report.
-export function Tab({ pressed, count, dot, children, ...props }: TabProps) {
+export function TopBarButton({ pressed, count, dot, children, ...props }: TopBarButtonProps) {
   return (
     <button className="ui-tab" type="button" aria-pressed={pressed} {...props}>
       {children}
@@ -72,7 +72,7 @@ export function Pane({
 }
 
 // A wide dashed button for adding a file.
-export function DropButton({
+export function AddFileButton({
   children,
   disabled,
   onClick,
@@ -96,8 +96,8 @@ export function Select({ options, allLabel, ...props }: SelectProps) {
   return (
     <select className="ui-select" {...props}>
       <option value="">{allLabel}</option>
-      {options.map((o) => (
-        <option key={o}>{o}</option>
+      {options.map((option) => (
+        <option key={option}>{option}</option>
       ))}
     </select>
   );
@@ -117,9 +117,9 @@ export type TableGroup = { key: string; label: string; rows: { key: string; cell
 // A table of rows grouped under collapsible headings, each heading showing its row count.
 // With `onSelect`, rows are clickable (mouse, Enter or Space).
 export function GroupTable({ groups, onSelect }: { groups: TableGroup[]; onSelect?: (key: string) => void }) {
-  const [closed, setClosed] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const toggle = (key: string) =>
-    setClosed((prev) => {
+    setCollapsedGroups((prev) => {
       const next = new Set(prev);
       if (!next.delete(key)) next.add(key);
       return next;
@@ -127,37 +127,37 @@ export function GroupTable({ groups, onSelect }: { groups: TableGroup[]; onSelec
 
   return (
     <table className="ui-table">
-      {groups.map((g) => {
-        const open = !closed.has(g.key);
+      {groups.map((group) => {
+        const open = !collapsedGroups.has(group.key);
         return (
-          <tbody key={g.key}>
+          <tbody key={group.key}>
             <tr className="ui-table-group">
               <td colSpan={groups[0]?.rows[0]?.cells.length ?? 1}>
-                <button type="button" aria-expanded={open} onClick={() => toggle(g.key)}>
+                <button type="button" aria-expanded={open} onClick={() => toggle(group.key)}>
                   {ICONS.chevron}
-                  <span>{g.label}</span>
-                  <span className="ui-table-count">{g.rows.length}</span>
+                  <span>{group.label}</span>
+                  <span className="ui-table-count">{group.rows.length}</span>
                 </button>
               </td>
             </tr>
             {open &&
-              g.rows.map((r) => (
+              group.rows.map((row) => (
                 <tr
-                  key={r.key}
+                  key={row.key}
                   className="ui-table-row"
                   tabIndex={onSelect ? 0 : undefined}
-                  onClick={onSelect && (() => onSelect(r.key))}
+                  onClick={onSelect && (() => onSelect(row.key))}
                   onKeyDown={
                     onSelect &&
                     ((e) => {
                       if (e.key !== "Enter" && e.key !== " ") return;
                       e.preventDefault();
-                      onSelect(r.key);
+                      onSelect(row.key);
                     })
                   }
                 >
-                  {r.cells.map((c, i) => (
-                    <td key={i}>{c}</td>
+                  {row.cells.map((cell, i) => (
+                    <td key={i}>{cell}</td>
                   ))}
                 </tr>
               ))}

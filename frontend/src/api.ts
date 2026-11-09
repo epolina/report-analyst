@@ -1,7 +1,7 @@
 // Calls to the backend. Types come from its OpenAPI schema: run `npm run gen:api` after
 // changing a backend model.
 import type { components } from "./api.gen";
-import { ERROR, type ErrorBody } from "./messages";
+import { ERROR_MESSAGES, type ErrorBody } from "./messages";
 
 type Schemas = components["schemas"];
 export type Report = Schemas["Report"];
@@ -29,45 +29,45 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, init).catch(() => {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`/api${path}`, init).catch(() => {
     throw new ApiError("Couldn't reach the server. Check your connection and try again.", 0, null);
   });
-  if (!res.ok) {
+  if (!response.ok) {
     // Errors raised on purpose have a `code`; FastAPI's own 422 has a `detail` list instead.
-    const body = await res.json().catch(() => null);
+    const body = await response.json().catch(() => null);
     const code: ErrorCode | undefined = body?.code;
     throw new ApiError(
-      code ? ERROR[code](body) : `Something went wrong (${res.status}). Try again.`,
-      res.status,
+      code ? ERROR_MESSAGES[code](body) : `Something went wrong (${response.status}). Try again.`,
+      response.status,
       code ? body : null,
     );
   }
-  return res.json();
+  return response.json();
 }
 
-export function uploadReport(file: File, company: string, reportingYear: number, onDuplicate?: OnDuplicate) {
-  const form = new FormData();
-  form.append("file", file);
-  form.append("company_name", company);
-  form.append("reporting_year", String(reportingYear));
-  if (onDuplicate) form.append("on_duplicate", onDuplicate);
-  return call<Report>("/uploads", { method: "POST", body: form });
+export function uploadReport(file: File, companyName: string, reportingYear: number, onDuplicate?: OnDuplicate) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("company_name", companyName);
+  formData.append("reporting_year", String(reportingYear));
+  if (onDuplicate) formData.append("on_duplicate", onDuplicate);
+  return request<Report>("/uploads", { method: "POST", body: formData });
 }
 
 // A background job is extracting the report's text or facts.
 export const isProcessing = (r: Report) => r.status === "processing";
 
 export function retryReport(reportId: string) {
-  return call<Report>(`/reports/${reportId}/retry`, { method: "POST" });
+  return request<Report>(`/reports/${reportId}/retry`, { method: "POST" });
 }
 
 export function listReports() {
-  return call<Report[]>("/reports");
+  return request<Report[]>("/reports");
 }
 
 export function getReport(reportId: string) {
-  return call<ReportDetail>(`/reports/${reportId}`);
+  return request<ReportDetail>(`/reports/${reportId}`);
 }
 
 // A page of a report as an image, for an <img> src. Rendered once, then served from disk.
@@ -77,7 +77,7 @@ export function pageImageUrl(reportId: string, page: number) {
 
 // Ask a Question; a null conversation starts a new one. Takes about 5-15 s.
 export function askQuestion(question: string, scope: Scope, conversationId: string | null) {
-  return call<ChatReply>("/chat", {
+  return request<ChatReply>("/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, scope, conversation_id: conversationId }),
@@ -85,5 +85,5 @@ export function askQuestion(question: string, scope: Scope, conversationId: stri
 }
 
 export function getConversation(conversationId: string) {
-  return call<Conversation>(`/conversations/${conversationId}`);
+  return request<Conversation>(`/conversations/${conversationId}`);
 }

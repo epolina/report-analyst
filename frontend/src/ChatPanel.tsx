@@ -2,7 +2,7 @@
 // `useChat` holds the state; the layout places the thread and the composer in different slots.
 import { useEffect, useState } from "react";
 import { askQuestion, getConversation, type ChatEvidence, type Report, type Scope, type Turn } from "./api";
-import { NOT_FOUND } from "./messages";
+import { NOT_FOUND_MESSAGES } from "./messages";
 import { ALL_COMPANIES, ANY_YEAR, companiesOf, yearsOf } from "./options";
 import {
   Answer,
@@ -19,7 +19,7 @@ import {
 
 // The open Conversation's id, so a reload shows it again.
 const CONVERSATION_KEY = "conversation";
-const storage = {
+const savedConversationId = {
   get: () => {
     try {
       return localStorage.getItem(CONVERSATION_KEY);
@@ -44,59 +44,73 @@ export function useChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
-  const [pending, setPending] = useState<string>();
+  const [pendingQuestion, setPendingQuestion] = useState<string>();
   const [error, setError] = useState("");
-  const [company, setCompany] = useState("");
-  const [year, setYear] = useState("");
+  const [scopeCompany, setScopeCompany] = useState("");
+  const [scopeYear, setScopeYear] = useState("");
 
   // Show the last Conversation again after a reload. One that's gone starts a fresh chat.
   useEffect(() => {
-    const id = storage.get();
+    const id = savedConversationId.get();
     if (!id) return;
     getConversation(id)
-      .then((c) => {
+      .then((conversation) => {
         setConversationId(id);
-        setTurns(c.turns);
+        setTurns(conversation.turns);
       })
-      .catch(() => storage.set(null));
+      .catch(() => savedConversationId.set(null));
   }, []);
 
   function ask(question: string) {
-    const scope = { company_name: company || null, reporting_year: year ? Number(year) : null };
-    setPending(question);
+    const scope = { company_name: scopeCompany || null, reporting_year: scopeYear ? Number(scopeYear) : null };
+    setPendingQuestion(question);
     setError("");
     setDraft("");
     askQuestion(question, scope, conversationId)
       .then((reply) => {
         setConversationId(reply.conversation_id);
-        storage.set(reply.conversation_id);
-        setTurns((t) => [...t, reply]);
+        savedConversationId.set(reply.conversation_id);
+        setTurns((previousTurns) => [...previousTurns, reply]);
         // The scope it searched, which the Question may have changed, carries over to the next.
-        setCompany(reply.scope.company_name ?? "");
-        setYear(reply.scope.reporting_year ? String(reply.scope.reporting_year) : "");
+        setScopeCompany(reply.scope.company_name ?? "");
+        setScopeYear(reply.scope.reporting_year ? String(reply.scope.reporting_year) : "");
       })
       .catch((e: Error) => {
         setError(e.message);
         setDraft(question);
       })
-      .finally(() => setPending(undefined));
+      .finally(() => setPendingQuestion(undefined));
   }
 
   function newChat() {
     setConversationId(null);
-    storage.set(null);
+    savedConversationId.set(null);
     setTurns([]);
     setError("");
   }
 
   // Ask about one report next, e.g. from its page in the drawer.
-  function scopeTo(report: { company_name: string; reporting_year: number }) {
-    setCompany(report.company_name);
-    setYear(String(report.reporting_year));
+  function scopeToReport(report: { company_name: string; reporting_year: number }) {
+    setScopeCompany(report.company_name);
+    setScopeYear(String(report.reporting_year));
   }
 
-  const busy = pending !== undefined;
-  return { turns, pending, busy, error, draft, setDraft, company, setCompany, year, setYear, ask, newChat, scopeTo };
+  const busy = pendingQuestion !== undefined;
+  return {
+    turns,
+    pendingQuestion,
+    busy,
+    error,
+    draft,
+    setDraft,
+    scopeCompany,
+    setScopeCompany,
+    scopeYear,
+    setScopeYear,
+    ask,
+    newChat,
+    scopeToReport,
+  };
 }
 
 type Chat = ReturnType<typeof useChat>;
@@ -115,15 +129,15 @@ export function ChatComposer({ chat, reports }: { chat: Chat; reports: Report[] 
             aria-label="Company"
             allLabel={ALL_COMPANIES}
             options={companiesOf(reports)}
-            value={chat.company}
-            onChange={(e) => chat.setCompany(e.target.value)}
+            value={chat.scopeCompany}
+            onChange={(e) => chat.setScopeCompany(e.target.value)}
           />
           <Select
             aria-label="Reporting year"
             allLabel={ANY_YEAR}
             options={yearsOf(reports)}
-            value={chat.year}
-            onChange={(e) => chat.setYear(e.target.value)}
+            value={chat.scopeYear}
+            onChange={(e) => chat.setScopeYear(e.target.value)}
           />
         </>
       }
@@ -134,13 +148,13 @@ export function ChatComposer({ chat, reports }: { chat: Chat; reports: Report[] 
 export function ChatThread({
   chat,
   reports,
-  onOpen,
+  onOpenEvidence,
 }: {
   chat: Chat;
   reports: Report[];
-  onOpen: (evidence: ChatEvidence) => void;
+  onOpenEvidence: (evidence: ChatEvidence) => void;
 }) {
-  const { turns, pending, busy } = chat;
+  const { turns, pendingQuestion, busy } = chat;
   return (
     <>
       {reports.length > 0 && !turns.length && !busy && (
@@ -152,13 +166,13 @@ export function ChatThread({
         />
       )}
       {(turns.length > 0 || busy) && (
-        <Thread size={turns.length * 2 + (busy ? 2 : 0)}>
+        <Thread messageCount={turns.length * 2 + (busy ? 2 : 0)}>
           {turns.map((t, i) => (
-            <TurnView key={i} turn={t} onOpen={onOpen} />
+            <TurnView key={i} turn={t} onOpenEvidence={onOpenEvidence} />
           ))}
           {busy && (
             <>
-              <Question>{pending}</Question>
+              <Question>{pendingQuestion}</Question>
               <Thinking label="Searching the reports" />
             </>
           )}
@@ -171,25 +185,25 @@ export function ChatThread({
 
 // Suggested first Questions, about a report that is there to answer them.
 function suggestionsFor(reports: Report[]) {
-  const r = reports.find((x) => x.status === "success") ?? reports[0];
+  const report = reports.find((candidate) => candidate.status === "success") ?? reports[0];
   return [
-    `How much did ${r.company_name} spend on climate change adaptation in ${r.reporting_year}?`,
-    `How many FTE did ${r.company_name} have in ${r.reporting_year}?`,
-    `What are ${r.company_name}'s sustainability goals?`,
+    `How much did ${report.company_name} spend on climate change adaptation in ${report.reporting_year}?`,
+    `How many FTE did ${report.company_name} have in ${report.reporting_year}?`,
+    `What are ${report.company_name}'s sustainability goals?`,
   ];
 }
 
 // One Question and its Answer, with Evidence that opens its page, or why it wasn't found.
-function TurnView({ turn, onOpen }: { turn: Turn; onOpen: (evidence: ChatEvidence) => void }) {
+function TurnView({ turn, onOpenEvidence }: { turn: Turn; onOpenEvidence: (evidence: ChatEvidence) => void }) {
   const { answer } = turn;
-  const notFound = NOT_FOUND[answer.reason ?? "not_in_report"];
+  const notFound = NOT_FOUND_MESSAGES[answer.reason ?? "not_in_report"];
   return (
     <>
       <Question meta={scopeLabel(turn.scope)}>{turn.question}</Question>
       <Answer text={answer.text}>
         {answer.kind === "answer" ? (
           answer.evidence.map((e, i) => (
-            <EvidenceCard key={i} source={sourceLabel(e)} quote={e.quote} onOpen={() => onOpen(e)} />
+            <EvidenceCard key={i} source={sourceLabel(e)} quote={e.quote} onOpen={() => onOpenEvidence(e)} />
           ))
         ) : (
           <NotFoundCard title={notFound.title}>{notFound.note}</NotFoundCard>
