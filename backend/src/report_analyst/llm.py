@@ -4,11 +4,8 @@ import anthropic
 import instructor
 import logging
 
-from anthropic.types.beta import (
-    BetaCitationCharLocation,
-    BetaCitationContentBlockLocation,
-    BetaContentBlockParam,
-)
+from anthropic.types.beta import BetaContentBlockParam
+from collections.abc import Sequence
 from instructor.core.exceptions import InstructorRetryException
 from pydantic import BaseModel
 from typing import Any
@@ -21,15 +18,15 @@ class LLMError(Exception):
     """The model gave no valid output after the retries, or the API call failed."""
 
 
-class Cited(BaseModel):
+class CitedSpan(BaseModel):
     """A span Claude cited: which document, and its text, copied exactly by the API.
 
     Attributes:
-        document: The document's index in the list given.
+        document_index: The document's index in the list given.
         text: The cited text, verbatim from that document.
     """
 
-    document: int
+    document_index: int
     text: str
 
 
@@ -42,7 +39,7 @@ class CitedAnswer(BaseModel):
     """
 
     text: str
-    citations: list[Cited]
+    citations: list[CitedSpan]
 
 
 _MAX_TOKENS = 16_000  # the output limit per call
@@ -66,9 +63,9 @@ class AnthropicLLM:
             client: The Anthropic client. The adapter wraps it with Instructor.
             model: The Claude model ID.
         """
-        self._anthropic = client
+        self._anthropic_client = client
         # beta=True: the refusal fallback below is a beta parameter.
-        self._client = instructor.from_anthropic(client, beta=True)
+        self._instructor_client = instructor.from_anthropic(client, beta=True)
         self._model = model
 
     def complete[T: BaseModel](
@@ -88,7 +85,7 @@ class AnthropicLLM:
             LLMError: If no valid answer came back after the retries, or the API call failed.
         """
         try:
-            return self._client.create(
+            return self._instructor_client.create(
                 response_model=schema,
                 messages=[{"role": "user", "content": prompt}],
                 # Instructor's max_retries counts the retries after the first try.
@@ -112,7 +109,7 @@ class AnthropicLLM:
                 f"No valid {schema.__name__} after {error.n_attempts} attempts"
             ) from error
 
-    def cite(self, prompt: str, documents: list[tuple[str, str | list[str]]]) -> CitedAnswer:
+    def cite(self, prompt: str, documents: Sequence[tuple[str, str]]) -> CitedAnswer:
         """Ask Claude about documents, getting text back with what it cites from them.
 
         The API copies each cited span from its document, so quotes are verbatim by
@@ -120,9 +117,8 @@ class AnthropicLLM:
 
         Args:
             prompt: The question and instructions, sent after the documents.
-            documents: (title, content) pairs; a citation names one by its index here. Text
-                is cited by sentence; a list of blocks (e.g. table rows) by whole blocks, which
-                come back joined by newlines.
+            documents: (title, text) pairs; a citation names one by its index here. Claude
+                cites the text, not the title.
 
         Returns:
             The answer and its citations.
@@ -133,19 +129,15 @@ class AnthropicLLM:
         content: list[BetaContentBlockParam] = [
             {
                 "type": "document",
-                "source": (
-                    {"type": "text", "media_type": "text/plain", "data": body}
-                    if isinstance(body, str)
-                    else {"type": "content", "content": [{"type": "text", "text": b} for b in body]}
-                ),
+                "source": {"type": "text", "media_type": "text/plain", "data": text},
                 "title": title,
                 "citations": {"enabled": True},
             }
-            for title, body in documents
+            for title, text in documents
         ]
         content.append({"type": "text", "text": prompt})
         try:
-            message = self._anthropic.beta.messages.create(
+            message = self._anthropic_client.beta.messages.create(
                 model=self._model,
                 max_tokens=_MAX_TOKENS,
                 messages=[{"role": "user", "content": content}],
@@ -157,25 +149,14 @@ class AnthropicLLM:
             raise LLMError(f"The model call failed: {error.message}") from error
         if message.stop_reason == "refusal":
             raise LLMError("The model declined to answer")
-        texts = [b for b in message.content if b.type == "text"]
+        text_blocks = [block for block in message.content if block.type == "text"]
+        citations = []
+        for block in text_blocks:
+            for citation in block.citations or []:
+                if citation.type == "char_location":  # what a plain-text document is cited by
+                    citations.append(
+                        CitedSpan(document_index=citation.document_index, text=citation.cited_text)
+                    )
         return CitedAnswer(
-            text="".join(b.text for b in texts).strip(),
-            citations=[
-                Cited(document=c.document_index, text=_cited_text(c, documents))
-                for b in texts
-                for c in b.citations or []
-                if c.type in ("char_location", "content_block_location")
-            ],
+            text="".join(block.text for block in text_blocks).strip(), citations=citations
         )
-
-
-def _cited_text(
-    citation: BetaCitationCharLocation | BetaCitationContentBlockLocation,
-    documents: list[tuple[str, str | list[str]]],
-) -> str:
-    # Text documents: the API's cited span. Block documents: the blocks themselves, by index,
-    # one per line, so a cited table keeps its rows apart.
-    _, body = documents[citation.document_index]
-    if citation.type == "content_block_location" and isinstance(body, list):
-        return "\n".join(body[citation.start_block_index : citation.end_block_index])
-    return citation.cited_text

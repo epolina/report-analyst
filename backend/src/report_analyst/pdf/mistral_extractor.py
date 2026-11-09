@@ -7,10 +7,15 @@ from mistralai.client.models import OCRPageObject, UnknownBlock
 from report_analyst.pdf.models import Block, BlockKind, PageBox
 
 
-_MODEL = "mistral-ocr-latest"
+_OCR_MODEL = "mistral-ocr-latest"
 _TIMEOUT_MS = 10 * 60 * 1000  # a 300-page report takes about 30 s; slack for a busy API
-_SKIPPED = {"header", "footer", "image", "signature"}  # unknown types too, from a newer API
-_KINDS = {"title": BlockKind.HEADING, "table": BlockKind.TABLE}  # the rest is text
+_SKIPPED_BLOCK_TYPES = {
+    "header",
+    "footer",
+    "image",
+    "signature",
+}  # unknown types too, from a newer API
+_KIND_BY_BLOCK_TYPE = {"title": BlockKind.HEADING, "table": BlockKind.TABLE}  # the rest is text
 
 
 class PdfExtractor(ABC):
@@ -56,35 +61,40 @@ class MistralExtractor(PdfExtractor):
             The Blocks, in reading order.
         """
         # Uploaded, not sent inline: a 40 MB report is over the request limit as base64.
-        file = self._client.files.upload(
+        uploaded_file = self._client.files.upload(
             file={"file_name": "report.pdf", "content": pdf}, purpose="ocr"
         )
         try:
             response = self._client.ocr.process(
-                model=_MODEL,
-                document={"type": "file", "file_id": file.id},
+                model=_OCR_MODEL,
+                document={"type": "file", "file_id": uploaded_file.id},
                 table_format="markdown",
                 extract_header=True,
                 extract_footer=True,
             )
         finally:
-            self._client.files.delete(file_id=file.id)
-        return [block for page in response.pages for block in _blocks(page)]
+            self._client.files.delete(file_id=uploaded_file.id)
+        return [block for page in response.pages for block in _page_blocks(page)]
 
 
-def _blocks(page: OCRPageObject) -> list[Block]:
+def _page_blocks(page: OCRPageObject) -> list[Block]:
     width, height = page.dimensions.width, page.dimensions.height  # type: ignore[union-attr]
     blocks = []
-    for b in page.blocks or []:
-        if isinstance(b, UnknownBlock) or b.type in _SKIPPED or not b.content.strip():
+    for ocr_block in page.blocks or []:
+        if (
+            isinstance(ocr_block, UnknownBlock)
+            or ocr_block.type in _SKIPPED_BLOCK_TYPES
+            or not ocr_block.content.strip()
+        ):
             continue
-        kind = _KINDS.get(b.type, BlockKind.TEXT)
-        text = b.content.lstrip("#").strip() if kind == BlockKind.HEADING else b.content.strip()
+        kind = _KIND_BY_BLOCK_TYPE.get(ocr_block.type, BlockKind.TEXT)
+        content = ocr_block.content
+        text = content.lstrip("#").strip() if kind == BlockKind.HEADING else content.strip()
         box = PageBox(
-            x=b.top_left_x / width,
-            y=b.top_left_y / height,
-            width=(b.bottom_right_x - b.top_left_x) / width,
-            height=(b.bottom_right_y - b.top_left_y) / height,
+            x=ocr_block.top_left_x / width,
+            y=ocr_block.top_left_y / height,
+            width=(ocr_block.bottom_right_x - ocr_block.top_left_x) / width,
+            height=(ocr_block.bottom_right_y - ocr_block.top_left_y) / height,
         )
         blocks.append(Block(page=page.index + 1, kind=kind, text=text, box=box))
     return blocks

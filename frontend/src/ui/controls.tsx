@@ -69,18 +69,18 @@ type DialogProps = {
 
 // A modal form on the native <dialog>: it traps focus, closes on Escape and dims the page.
 export function Dialog({ open, title, description, locked, onClose, onSubmit, actions, children }: DialogProps) {
-  const ref = useRef<HTMLDialogElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
   useEffect(() => {
-    const d = ref.current;
-    if (open && !d?.open) d?.showModal();
-    if (!open && d?.open) d.close();
+    const dialog = dialogRef.current;
+    if (open && !dialog?.open) dialog?.showModal();
+    if (!open && dialog?.open) dialog.close();
   }, [open]);
 
   return (
     <dialog
-      ref={ref}
+      ref={dialogRef}
       className="ui-dialog"
       aria-labelledby={titleId}
       onClose={onClose}
@@ -91,8 +91,12 @@ export function Dialog({ open, title, description, locked, onClose, onSubmit, ac
       // The backdrop belongs to the <dialog>, so a click outside its box is a click on the backdrop.
       onClick={(e) => {
         if (locked) return;
-        const r = e.currentTarget.getBoundingClientRect();
-        const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+        const bounds = e.currentTarget.getBoundingClientRect();
+        const inside =
+          e.clientX >= bounds.left &&
+          e.clientX <= bounds.right &&
+          e.clientY >= bounds.top &&
+          e.clientY <= bounds.bottom;
         if (e.target === e.currentTarget && !inside) onClose();
       }}
     >

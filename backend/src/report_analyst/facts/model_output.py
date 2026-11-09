@@ -11,15 +11,15 @@ import logging
 from pydantic import BaseModel, Field, ValidationInfo, model_validator
 from typing import Self
 
-from report_analyst.domain import Evidence, Facts, Fte, Passage, SustainabilityGoal, plain
+from report_analyst.domain import Evidence, Facts, Fte, Passage, SustainabilityGoal, strip_markup
 
 
 logger = logging.getLogger(__name__)
 
-PASSAGES_KEY = "passages"
+PASSAGES_CONTEXT_KEY = "passages"
 
 
-class Citation(BaseModel):
+class PassageCitation(BaseModel):
     """Where a fact is stated: a Passage and a quote from it."""
 
     passage_id: int = Field(description="The id of the passage that states the fact.")
@@ -32,13 +32,13 @@ class Citation(BaseModel):
 
     @model_validator(mode="after")
     def _check_passage_id(self, info: ValidationInfo) -> Self:
-        if info.context is not None and self.passage_id not in info.context[PASSAGES_KEY]:
+        if info.context is not None and self.passage_id not in info.context[PASSAGES_CONTEXT_KEY]:
             raise ValueError(
                 f"There's no passage {self.passage_id}. Cite only ids of the passages shown."
             )
         return self
 
-    def evidence(self, passages: dict[int, Passage]) -> Evidence | None:
+    def to_evidence(self, passages: dict[int, Passage]) -> Evidence | None:
         """Turn the citation into Evidence: the cited Passage's page and boxes, and the quote.
 
         Args:
@@ -48,7 +48,7 @@ class Citation(BaseModel):
             The Evidence, or None if the quote isn't in the Passage, ignoring markup.
         """
         passage = passages[self.passage_id]
-        if not (quote := plain(self.quote)) or quote not in plain(passage.text):
+        if not (quote := strip_markup(self.quote)) or quote not in strip_markup(passage.text):
             logger.warning(
                 "Dropped a citation: quote not in passage %d: %r", passage.index, self.quote
             )
@@ -56,29 +56,29 @@ class Citation(BaseModel):
         return Evidence(page=passage.page, quote=self.quote, boxes=passage.boxes_of(self.quote))
 
 
-class FteAnswer(BaseModel):
+class FteOutput(BaseModel):
     """The Company's total FTE for the year."""
 
     amount: float = Field(description="The total number of full-time equivalents.")
-    citation: Citation
+    citation: PassageCitation
 
 
-class GoalAnswer(BaseModel):
+class GoalOutput(BaseModel):
     """A sustainability target the Company has set."""
 
     title: str = Field(description="What the goal is, in at most 10 words, with its target.")
     deadline: int | None = Field(None, description="The year it must be met, if stated.")
     baseline: int | None = Field(None, description="The year it's measured against, if stated.")
-    citation: Citation
+    citation: PassageCitation
 
 
-class FactsAnswer(BaseModel):
+class FactsOutput(BaseModel):
     """The facts found in the passages. Empty means none are stated."""
 
-    fte: FteAnswer | None = None
-    goals: list[GoalAnswer] = []
+    fte: FteOutput | None = None
+    goals: list[GoalOutput] = []
 
-    def facts(self, passages: dict[int, Passage]) -> Facts:
+    def to_facts(self, passages: dict[int, Passage]) -> Facts:
         """Turn the answer into Facts, each with the Evidence of its citation.
 
         Args:
@@ -88,15 +88,18 @@ class FactsAnswer(BaseModel):
             The Facts whose quote is in the cited Passage; the others are dropped.
         """
         fte = None
-        if self.fte and (evidence := self.fte.citation.evidence(passages)):
+        if self.fte and (evidence := self.fte.citation.to_evidence(passages)):
             fte = Fte(amount=self.fte.amount, evidence=evidence)
         goals = []
-        for g in self.goals:
-            evidence = g.citation.evidence(passages)
+        for goal in self.goals:
+            evidence = goal.citation.to_evidence(passages)
             if evidence:
                 goals.append(
                     SustainabilityGoal(
-                        title=g.title, deadline=g.deadline, baseline=g.baseline, evidence=evidence
+                        title=goal.title,
+                        deadline=goal.deadline,
+                        baseline=goal.baseline,
+                        evidence=evidence,
                     )
                 )
         return Facts(fte=fte, goals=goals)

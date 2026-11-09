@@ -1,10 +1,10 @@
 # Report analyst
 
-Ask questions about companies' annual reports and get answers you can check. Every answer quotes the report word for word and shows the page, with the quoted passage highlighted. If the report doesn't say, the answer is "Not Found" instead of a guess.
+Ask about the FTE and sustainability goals in companies' annual reports and get answers you can check. Every answer quotes the report word for word and shows the page, with the quoted passage highlighted. If the report doesn't say, the answer is "Not Found" instead of a guess.
 
 - **Add a report.** Upload a PDF and type its Company and Reporting Year. Processing then runs in the background: it reads the text, renders the pages, builds a search index and extracts two facts, the total **FTE** and the **sustainability goals**, each with its evidence.
 - **Browse a report.** Open it from the Reports drawer to see its facts next to the PDF page each one comes from.
-- **Chat.** Ask in plain English, e.g. "How many FTE did Shell have in 2024?". A Company or year named in the question sets the scope; otherwise the selects under the input do. Conversations are kept across restarts.
+- **Chat.** Ask about the FTE or the sustainability goals in plain English, e.g. "How many FTE did Shell have in 2024?" or "Compare the goals of ABN 2025 and Shell 2025". Claude first matches the question to the stored reports, short names included; a Company or year with no stored report is named back to you, and a question about anything else gets "Sorry, we only support questions about the FTE and sustainability goals". It then answers from the facts extracted while processing. Conversations are kept across restarts.
 
 Everything runs on your machine except two API calls: Mistral reads the PDF's text, and Claude writes the facts and answers. Data is stored as files under `backend/data/`.
 
@@ -114,3 +114,10 @@ Three different PDF extractors were tried behind one `PdfExtractor` interface.
 | 1. PyMuPDF (pymupdf4llm) | ~1 min / 300 pages, local | Fast, but no positions: we can't highlight the evidence on the page |
 | 2. Docling | Several minutes / 300 pages, local | Good tables and boxes, but slow, memory-hungry (had to process 20 pages at a time) and pulls in PyTorch |
 | 3. Mistral OCR (**default**) | 33 s / 307 pages | Typed blocks (title, text, table) with boxes, headers/footers dropped. Trade-off: the PDF goes to Mistral's API |
+
+## Next steps
+
+1. **Async calls for production.** Today nothing is `async`, on purpose: it's built for one analyst on one machine (see [ARCHITECTURE.md](ARCHITECTURE.md)). With many users, each chat question waiting on Claude holds a thread from FastAPI's pool. Before going to production, move the chat route and the Claude and Mistral clients to their async versions (`async def` routes, `anthropic.AsyncAnthropic`), and replace the in-memory processing queue with a real job queue (arq, RQ) so jobs survive restarts and can run on more workers.
+2. **A database, with migrations.** Today reports and Conversations are files, which is enough for one process (see [ARCHITECTURE.md](ARCHITECTURE.md)). With several processes or users, move the metadata, Facts and Conversations to PostgreSQL, behind the existing repositories so the services don't change, and keep PDFs and page images in object storage. Manage the schema with Alembic, so a change like renaming a field is a versioned migration that runs on deploy, not a one-off script like `scripts/migrate_field_names.py`. pgvector could then hold the embeddings too, in place of `embeddings.npy` and the in-memory index.
+3. **Evaluate fact extraction.** Measure the recall of the FTE and the Sustainability Goals. Label a set of reports by hand: the FTE figure and every goal, each with its page. Then score what processing extracts against those labels: is the FTE found and correct, and what share of the labelled goals is found (with precision alongside, so a long list of non-goals doesn't look good). Run it whenever the prompt, the search queries or the PDF extractor change.
+4. **Evaluate the chat** with LangWatch's [agentic AI testing framework](https://langwatch.ai/agentic-ai-testing) (Scenario). A simulated user holds whole Conversations with the chat, follow-ups included ("and in 2025?"), and a judge checks each one against written criteria. Build the scenarios from Questions with known answers, including some the reports don't answer, and check that each Answer is right, that its Evidence quotes the page that states it, and that the unanswerable ones come back Not Found rather than a guess. The scenarios run as tests, so they can run in CI next to the existing suite.

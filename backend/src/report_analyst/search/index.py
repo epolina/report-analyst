@@ -7,10 +7,10 @@ import re
 
 from collections import Counter
 
-from report_analyst.embedder import Vectors
+from report_analyst.search.embedder import Vectors
 
 
-_TOKEN = re.compile(r"\w+")
+_WORD_PATTERN = re.compile(r"\w+")
 _RRF_K = 60  # the usual constant: dampens how much the very top ranks dominate
 
 
@@ -28,7 +28,9 @@ def tokenize(text: str) -> list[str]:
     Returns:
         The tokens, in order.
     """
-    return [w[:-1] if len(w) > 3 and w.endswith("s") else w for w in _TOKEN.findall(text.lower())]
+    return [
+        w[:-1] if len(w) > 3 and w.endswith("s") else w for w in _WORD_PATTERN.findall(text.lower())
+    ]
 
 
 class BM25:
@@ -42,12 +44,16 @@ class BM25:
             k1: How quickly repeats of a word stop adding to the score.
             b: How much longer documents are penalised, from 0 (not) to 1 (fully).
         """
-        self._counts = [Counter(tokenize(d)) for d in documents]
-        self._lengths = np.array([sum(c.values()) for c in self._counts], dtype=np.float64)
-        self._average = float(self._lengths.mean())
-        frequency = Counter(word for c in self._counts for word in c)
+        self._word_counts = [Counter(tokenize(d)) for d in documents]
+        self._document_lengths = np.array(
+            [sum(c.values()) for c in self._word_counts], dtype=np.float64
+        )
+        self._average_length = float(self._document_lengths.mean())
+        document_frequency = Counter(word for c in self._word_counts for word in c)
         n = len(documents)
-        self._idf = {w: math.log(1 + (n - f + 0.5) / (f + 0.5)) for w, f in frequency.items()}
+        self._idf = {
+            w: math.log(1 + (n - f + 0.5) / (f + 0.5)) for w, f in document_frequency.items()
+        }
         self._k1 = k1
         self._b = b
 
@@ -61,13 +67,15 @@ class BM25:
             One score per document, in order; 0 for a document sharing no word with the query.
         """
         # Scans every document per query; ~1,600 per report is a few ms.
-        norm = self._k1 * (1 - self._b + self._b * self._lengths / max(self._average, 1e-12))
-        scores = np.zeros(len(self._counts))
+        length_norm = self._k1 * (
+            1 - self._b + self._b * self._document_lengths / max(self._average_length, 1e-12)
+        )
+        scores = np.zeros(len(self._word_counts))
         for word in set(tokenize(query)):
             if (idf := self._idf.get(word)) is None:
                 continue
-            tf = np.array([c[word] for c in self._counts], dtype=np.float64)
-            scores += idf * tf * (self._k1 + 1) / (tf + norm)
+            tf = np.array([c[word] for c in self._word_counts], dtype=np.float64)
+            scores += idf * tf * (self._k1 + 1) / (tf + length_norm)
         return scores
 
 
@@ -88,24 +96,26 @@ class HybridIndex:
         self._bm25 = BM25(texts)
         self._vectors = vectors
 
-    def search(self, query: str, query_vector: Vectors, k: int) -> list[int]:
+    def search(self, query: str, query_vector: Vectors, limit: int) -> list[int]:
         """Find the texts that best match a query.
 
         Args:
             query: The query, for keyword ranking.
             query_vector: The query embedded with the model the texts were embedded with.
-            k: How many to return.
+            limit: How many to return.
 
         Returns:
-            The row numbers of up to `k` texts, best first.
+            The row numbers of up to `limit` texts, best first.
         """
-        fused = _rrf(self._vectors @ query_vector) + _rrf(
+        fused = _reciprocal_rank_scores(self._vectors @ query_vector) + _reciprocal_rank_scores(
             self._bm25.scores(query), only_positive=True
         )
-        return [int(i) for i in np.argsort(-fused, kind="stable")[:k]]
+        return [int(i) for i in np.argsort(-fused, kind="stable")[:limit]]
 
 
-def _rrf(scores: npt.NDArray[np.floating], only_positive: bool = False) -> npt.NDArray[np.float64]:
+def _reciprocal_rank_scores(
+    scores: npt.NDArray[np.floating], only_positive: bool = False
+) -> npt.NDArray[np.float64]:
     # Rank 1 is the highest score. With only_positive, a 0 score (no shared word) gets nothing.
     ranks = np.empty(len(scores))
     ranks[np.argsort(-scores, kind="stable")] = np.arange(1, len(scores) + 1)

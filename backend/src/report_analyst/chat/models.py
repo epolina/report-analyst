@@ -1,4 +1,4 @@
-"""A Conversation: Questions, the scope each searched, and Answers backed by Evidence."""
+"""A Conversation: Questions, the reports each was about, and Answers backed by Evidence."""
 
 from enum import StrEnum
 from pydantic import BaseModel, Field
@@ -8,41 +8,49 @@ from uuid import UUID, uuid4
 from report_analyst.domain import Evidence
 
 
-class Scope(BaseModel):
-    """Which reports a Question searches. None means any.
+class ReportRef(BaseModel):
+    """A stored report, named the way the UI shows it.
 
     Attributes:
-        company: The Company.
-        reporting_year: The Reporting Year.
-    """
-
-    company: str | None = None
-    reporting_year: int | None = None
-
-
-class ChatEvidence(Evidence):
-    """Evidence for an Answer, naming its report, since one Question can search several.
-
-    Attributes:
-        report_id: The report the quote is from.
+        report_id: The report's id.
         company_name: Its Company.
-        year: Its Reporting Year.
+        reporting_year: Its Reporting Year.
     """
 
     report_id: UUID
     company_name: str
-    year: int
+    reporting_year: int
+
+
+class ChatEvidence(Evidence):
+    """Evidence for an Answer, naming its report, since one Question can be about several.
+
+    Attributes:
+        report_id: The report the quote is from.
+        company_name: Its Company.
+        reporting_year: Its Reporting Year.
+    """
+
+    report_id: UUID
+    company_name: str
+    reporting_year: int
 
 
 class NotFoundReason(StrEnum):
     """Why a Question has no Answer."""
 
     NOT_IN_REPORT = "not_in_report"
-    """The searched reports don't state it, or the quote couldn't be verified."""
+    """The reports' extracted Facts don't state it, or the answer cited none of them."""
     REPORT_NOT_READY = "report_not_ready"
-    """The reports in scope are still processing or failed."""
+    """The reports asked about are still processing or failed."""
     NO_REPORT = "no_report"
-    """No report matches the scope."""
+    """No report is stored yet."""
+    NO_COMPANY_NAMED = "no_company_named"
+    """The Question, and the earlier ones, name no Company to look up."""
+    NO_MATCHING_REPORT = "no_matching_report"
+    """The Question names a Company or year that no stored report has; see `missing`."""
+    UNSUPPORTED_TOPIC = "unsupported_topic"
+    """The Question isn't about the FTE or the Sustainability Goals, the only Facts kept."""
 
 
 class Answer(BaseModel):
@@ -54,12 +62,15 @@ class Answer(BaseModel):
             asking Claude, which the UI words from `reason`.
         evidence: At least one for an answer; none for Not Found.
         reason: Why it wasn't found; None for an answer.
+        missing: For `no_matching_report`, what the Question names that isn't stored, e.g.
+            "ABN AMRO 2023"; empty otherwise.
     """
 
     kind: Literal["answer", "not_found"]
     text: str
     evidence: list[ChatEvidence] = []
     reason: NotFoundReason | None = None
+    missing: list[str] = []
 
 
 class Turn(BaseModel):
@@ -67,12 +78,13 @@ class Turn(BaseModel):
 
     Attributes:
         question: As the user typed it.
-        scope: The scope it searched, after reading the Company and year from the Question.
+        reports: The reports the Question was matched to and answered from; empty if none
+            matched.
         answer: The Answer.
     """
 
     question: str
-    scope: Scope
+    reports: list[ReportRef] = []
     answer: Answer
 
 

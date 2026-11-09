@@ -16,8 +16,8 @@ class ConversationRepository:
         Args:
             conversations_dir: The folder.
         """
-        self._dir = conversations_dir
-        self._dir.mkdir(parents=True, exist_ok=True)
+        self._conversations_dir = conversations_dir
+        self._conversations_dir.mkdir(parents=True, exist_ok=True)
 
     def get(self, conversation_id: UUID) -> Conversation | None:
         """Get a Conversation.
@@ -28,7 +28,7 @@ class ConversationRepository:
         Returns:
             The Conversation, or None if there's none with this id.
         """
-        path = self._dir / f"{conversation_id}.json"
+        path = self._conversations_dir / f"{conversation_id}.json"
         return Conversation.model_validate_json(path.read_bytes()) if path.exists() else None
 
     def save(self, conversation: Conversation) -> None:
@@ -37,5 +37,5 @@ class ConversationRepository:
         Args:
             conversation: The Conversation.
         """
-        path = self._dir / f"{conversation.conversation_id}.json"
+        path = self._conversations_dir / f"{conversation.conversation_id}.json"
         write_atomic(path, conversation.model_dump_json(indent=2).encode())

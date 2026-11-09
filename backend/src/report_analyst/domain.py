@@ -4,16 +4,17 @@ import re
 
 from enum import StrEnum
 from pydantic import BaseModel, computed_field
+from typing import ClassVar
 from uuid import UUID
 
 from report_analyst.pdf import Block, PageBox
 
 
 # Markdown and HTML in extracted text (bold, table pipes, headings, <sup>, <br>, comments).
-_MARKUP = re.compile(r"<[^>]*>|[*_|#`]")
+_MARKUP_PATTERN = re.compile(r"<[^>]*>|[*_|#`]")
 
 
-def plain(text: str) -> str:
+def strip_markup(text: str) -> str:
     """The text without Markdown and HTML, whitespace collapsed, for search and quote checks.
 
     Args:
@@ -22,7 +23,7 @@ def plain(text: str) -> str:
     Returns:
         The plain text.
     """
-    return " ".join(_MARKUP.sub(" ", text).split())
+    return " ".join(_MARKUP_PATTERN.sub(" ", text).split())
 
 
 class ReportStatus(StrEnum):
@@ -53,23 +54,23 @@ class Report(BaseModel):
     Attributes:
         report_id: The report's id. Kept when the report is replaced.
         company_name: The Company, spelled as it was first entered for any report.
-        year: The Reporting Year.
+        reporting_year: The Reporting Year.
         sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.
-        pages: The number of pages.
+        page_count: The number of pages.
         status: Where it is in processing.
         failure: Why processing failed; None unless `status` is failed.
     """
 
     report_id: UUID
     company_name: str
-    year: int
+    reporting_year: int
     sha256: str
-    pages: int
+    page_count: int
     status: ReportStatus
     failure: ReportFailure | None = None
 
     @property
-    def processing(self) -> bool:
+    def is_processing(self) -> bool:
         """Whether a background job is extracting its text or Facts."""
         return self.status is ReportStatus.PROCESSING
 
@@ -114,14 +115,14 @@ class Passage(BaseModel):
             The boxes of the paragraphs or tables that contain the quote, ignoring markup; all
             the Passage's boxes if it spans several.
         """
-        quote = plain(quote)
-        holding = [b for b in self.blocks if quote and quote in plain(b.text)]
-        return [b.box for b in holding or self.blocks]
+        quote = strip_markup(quote)
+        blocks_with_quote = [b for b in self.blocks if quote and quote in strip_markup(b.text)]
+        return [b.box for b in blocks_with_quote or self.blocks]
 
     @property
     def search_text(self) -> str:
         """The heading and text without Markdown, as keyword and embedding search read it."""
-        return plain(f"{self.heading}\n{self.text}")
+        return strip_markup(f"{self.heading}\n{self.text}")
 
 
 class Evidence(BaseModel):
@@ -147,8 +148,24 @@ class Fte(BaseModel):
         evidence: Where the report states it.
     """
 
+    # What this kind of Fact is and how a question asks about it, as Claude reads it in the
+    # chat's prompts. A class attribute: not stored, not sent by the API.
+    description: ClassVar[str] = (
+        "The Company's total number of full-time equivalents (FTE) for the Reporting Year, not"
+        " headcount. A question about the number of employees, staff or FTE asks about it."
+    )
+
     amount: float  # reports may give a fraction, e.g. 82,302.5
     evidence: Evidence
+
+    def as_string(self) -> str:
+        """Say what the Fact states, e.g. "FTE 88,497" or "FTE 82,302.5".
+
+        Returns:
+            The text, never in exponent notation.
+        """
+        amount = self.amount
+        return f"FTE {amount:,.0f}" if amount.is_integer() else f"FTE {amount:,}"
 
 
 class SustainabilityGoal(BaseModel):
@@ -162,10 +179,31 @@ class SustainabilityGoal(BaseModel):
         evidence: Where the report states it.
     """
 
+    # What this kind of Fact is and how a question asks about it, as Claude reads it in the
+    # chat's prompts. A class attribute: not stored, not sent by the API.
+    description: ClassVar[str] = (
+        "A sustainability target the Company has set, e.g. on emissions, energy, water,"
+        " packaging, sourcing, diversity or safety. A question about sustainability goals,"
+        " targets or commitments asks about them."
+    )
+
     title: str
     deadline: int | None = None
     baseline: int | None = None
     evidence: Evidence
+
+    def as_string(self) -> str:
+        """Say what the Fact states, e.g. "Sustainability goal: Net zero, deadline 2050".
+
+        Returns:
+            The title, with the deadline and baseline when the report states them.
+        """
+        parts = [f"Sustainability goal: {self.title}"]
+        if self.deadline:
+            parts.append(f"deadline {self.deadline}")
+        if self.baseline:
+            parts.append(f"baseline {self.baseline}")
+        return ", ".join(parts)
 
 
 class Facts(BaseModel):

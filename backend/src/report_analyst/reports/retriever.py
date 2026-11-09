@@ -3,14 +3,13 @@
 from uuid import UUID
 
 from report_analyst.domain import Passage
-from report_analyst.embedder import Embedder, Vectors
-from report_analyst.index import HybridIndex
 from report_analyst.reports.repository import ReportRepository
+from report_analyst.search import Embedder, HybridIndex, Vectors
 
 
 # Indexes stay in memory between requests, keyed by report and when its Passages were saved, so
 # a replaced or retried report is loaded afresh. Unbounded; fine for tens of reports.
-_INDEXES: dict[tuple[UUID, int], tuple[list[Passage], HybridIndex]] = {}
+_INDEX_CACHE: dict[tuple[UUID, int], tuple[list[Passage], HybridIndex]] = {}
 
 
 class Retriever:
@@ -37,35 +36,35 @@ class Retriever:
         """
         return self._embedder.embed_passages([p.search_text for p in passages])
 
-    def search(self, report_id: UUID, query: str, k: int = 8) -> list[Passage]:
+    def search(self, report_id: UUID, query: str, limit: int = 8) -> list[Passage]:
         """Find the Passages of a report that best match a query.
 
         Args:
             report_id: The report. An unknown report, or one not processed yet, gives no
                 Passages.
             query: What to look for, e.g. a question or a topic.
-            k: How many Passages to return.
+            limit: How many Passages to return.
 
         Returns:
-            Up to `k` Passages, best first.
+            Up to `limit` Passages, best first.
         """
-        if (loaded := self._index(report_id)) is None:
+        if (cached := self._load_index(report_id)) is None:
             return []
-        passages, index = loaded
-        found = index.search(query, self._embedder.embed_query(query)[0], k)
-        return [passages[i] for i in found]
+        passages, index = cached
+        row_numbers = index.search(query, self._embedder.embed_query(query)[0], limit)
+        return [passages[i] for i in row_numbers]
 
-    def _index(self, report_id: UUID) -> tuple[list[Passage], HybridIndex] | None:
+    def _load_index(self, report_id: UUID) -> tuple[list[Passage], HybridIndex] | None:
         version = self._repository.passages_version(report_id)
         if version is None:
             return None
-        key = (report_id, version)
-        if key not in _INDEXES:
+        cache_key = (report_id, version)
+        if cache_key not in _INDEX_CACHE:
             passages = self._repository.passages(report_id)
             if not passages:
                 return None
             index = HybridIndex(
                 [p.search_text for p in passages], self._repository.embeddings(report_id)
             )
-            _INDEXES[key] = (passages, index)
-        return _INDEXES[key]
+            _INDEX_CACHE[cache_key] = (passages, index)
+        return _INDEX_CACHE[cache_key]

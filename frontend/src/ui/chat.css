@@ -8,15 +8,6 @@
   margin: 0 auto;
 }
 
-.ui-scope {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding-left: var(--space-1);
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
 .ui-ask {
   display: flex;
   gap: var(--space-3);

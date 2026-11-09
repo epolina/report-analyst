@@ -11,7 +11,7 @@
           "uploads"
         ],
         "summary": "Upload",
-        "description": "Add an annual report PDF, asking first about a duplicate, and start processing it.\n\nProcessing runs in the background: poll `GET /reports` until the report's status is success\nor failed. One report is processed at a time; a second one waits its turn.\n\nArgs:\n    settings: The app settings.\n    service: Stores the report, then extracts its FTE and goals.\n    file: The annual report PDF.\n    company: The Company the report belongs to, as entered by the user.\n    reporting_year: The Reporting Year the report covers.\n    on_duplicate: What to do when a report for this Company and year is stored; None asks\n        first with a 409 `same_company_year`.\n\nReturns:\n    The stored report, processing.\n\nRaises:\n    ApiError: 409 `same_file`, `same_company_year` or `still_processing`, naming the stored\n        report; 413 `file_too_large`; 415 `not_a_pdf`; 422 `unreadable_pdf` if pdfium\n        can't open it. Missing or invalid fields get FastAPI's own 422 validation error.",
+        "description": "Add an annual report PDF, asking first about a duplicate, and start processing it.\n\nProcessing runs in the background: poll `GET /reports` until the report's status is success\nor failed. One report is processed at a time; a second one waits its turn.\n\nArgs:\n    settings: The app settings.\n    service: Stores the report, then extracts its FTE and goals.\n    file: The annual report PDF.\n    company_name: The Company the report belongs to, as entered by the user.\n    reporting_year: The Reporting Year the report covers.\n    on_duplicate: What to do when a report for this Company and year is stored; None asks\n        first with a 409 `same_company_year`.\n\nReturns:\n    The stored report, processing.\n\nRaises:\n    ApiError: 409 `same_file`, `same_company_year` or `still_processing`, naming the stored\n        report; 413 `file_too_large`; 415 `not_a_pdf`; 422 `unreadable_pdf` if pdfium\n        can't open it. Missing or invalid fields get FastAPI's own 422 validation error.",
         "operationId": "upload_uploads_post",
         "requestBody": {
           "content": {
@@ -39,7 +39,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ExistingOut"
+                  "$ref": "#/components/schemas/ExistingReportOut"
                 }
               }
             }
@@ -221,14 +221,14 @@
         }
       }
     },
-    "/reports/{report_id}/pages/{number}": {
+    "/reports/{report_id}/pages/{page_number}": {
       "get": {
         "tags": [
           "reports"
         ],
         "summary": "Get Page",
-        "description": "Get one page of a report as a JPEG image, rendered while it was processed.\n\nArgs:\n    report_id: The report's id.\n    number: The page number, starting at 1.\n    repository: Where the page images are stored.\n\nReturns:\n    The image.\n\nRaises:\n    ApiError: 404 `page_not_found`, also for an unknown report.",
-        "operationId": "get_page_reports__report_id__pages__number__get",
+        "description": "Get one page of a report as a JPEG image, rendered while it was processed.\n\nArgs:\n    report_id: The report's id.\n    page_number: The page number, starting at 1.\n    repository: Where the page images are stored.\n\nReturns:\n    The image.\n\nRaises:\n    ApiError: 404 `page_not_found`, also for an unknown report.",
+        "operationId": "get_page_reports__report_id__pages__page_number__get",
         "parameters": [
           {
             "name": "report_id",
@@ -241,12 +241,12 @@
             }
           },
           {
-            "name": "number",
+            "name": "page_number",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Number"
+              "title": "Page Number"
             }
           }
         ],
@@ -286,7 +286,7 @@
           "chat"
         ],
         "summary": "Ask",
-        "description": "Answer a Question from the reports in scope, with verbatim Evidence, or say Not Found.\n\nNot Found is a normal answer (`kind: \"not_found\"`), not an error. Takes about 5-15 s.\n\nArgs:\n    request: The Question.\n    service: Answers it.\n\nReturns:\n    The Turn and its Conversation's id.\n\nRaises:\n    ApiError: 404 `conversation_not_found`; 502 `answer_failed` if Claude couldn't answer.",
+        "description": "Answer a Question about the FTE or Sustainability Goals, with verbatim Evidence.\n\nNot Found is a normal answer (`kind: \"not_found\"`), not an error: also for a Company\nor year with no stored report, or a Question about anything else. Takes about 5-15 s.\n\nArgs:\n    request: The Question.\n    service: Answers it.\n\nReturns:\n    The Turn and its Conversation's id.\n\nRaises:\n    ApiError: 404 `conversation_not_found`; 502 `answer_failed` if Claude couldn't answer.",
         "operationId": "ask_chat_post",
         "requestBody": {
           "content": {
@@ -452,6 +452,14 @@
                 "type": "null"
               }
             ]
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing",
+            "default": []
           }
         },
         "type": "object",
@@ -460,7 +468,7 @@
           "text"
         ],
         "title": "Answer",
-        "description": "What the user sees for a Question: an answer with Evidence, or Not Found with a reason.\n\nAttributes:\n    kind: Whether the reports answered it.\n    text: Claude's plain text, never HTML; \"\" for a Not Found the app decided without\n        asking Claude, which the UI words from `reason`.\n    evidence: At least one for an answer; none for Not Found.\n    reason: Why it wasn't found; None for an answer."
+        "description": "What the user sees for a Question: an answer with Evidence, or Not Found with a reason.\n\nAttributes:\n    kind: Whether the reports answered it.\n    text: Claude's plain text, never HTML; \"\" for a Not Found the app decided without\n        asking Claude, which the UI words from `reason`.\n    evidence: At least one for an answer; none for Not Found.\n    reason: Why it wasn't found; None for an answer.\n    missing: For `no_matching_report`, what the Question names that isn't stored, e.g.\n        \"ABN AMRO 2023\"; empty otherwise."
       },
       "Body_upload_uploads_post": {
         "properties": {
@@ -469,10 +477,10 @@
             "contentMediaType": "application/octet-stream",
             "title": "File"
           },
-          "company": {
+          "company_name": {
             "type": "string",
             "minLength": 1,
-            "title": "Company"
+            "title": "Company Name"
           },
           "reporting_year": {
             "type": "integer",
@@ -494,7 +502,7 @@
         "type": "object",
         "required": [
           "file",
-          "company",
+          "company_name",
           "reporting_year"
         ],
         "title": "Body_upload_uploads_post"
@@ -525,9 +533,9 @@
             "type": "string",
             "title": "Company Name"
           },
-          "year": {
+          "reporting_year": {
             "type": "integer",
-            "title": "Year"
+            "title": "Reporting Year"
           }
         },
         "type": "object",
@@ -537,10 +545,10 @@
           "boxes",
           "report_id",
           "company_name",
-          "year"
+          "reporting_year"
         ],
         "title": "ChatEvidence",
-        "description": "Evidence for an Answer, naming its report, since one Question can search several.\n\nAttributes:\n    report_id: The report the quote is from.\n    company_name: Its Company.\n    year: Its Reporting Year."
+        "description": "Evidence for an Answer, naming its report, since one Question can be about several.\n\nAttributes:\n    report_id: The report the quote is from.\n    company_name: Its Company.\n    reporting_year: Its Reporting Year."
       },
       "ChatReply": {
         "properties": {
@@ -548,8 +556,13 @@
             "type": "string",
             "title": "Question"
           },
-          "scope": {
-            "$ref": "#/components/schemas/Scope"
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/ReportRef"
+            },
+            "type": "array",
+            "title": "Reports",
+            "default": []
           },
           "answer": {
             "$ref": "#/components/schemas/Answer"
@@ -563,7 +576,6 @@
         "type": "object",
         "required": [
           "question",
-          "scope",
           "answer",
           "conversation_id"
         ],
@@ -589,10 +601,6 @@
             "maxLength": 2000,
             "minLength": 1,
             "title": "Question"
-          },
-          "scope": {
-            "$ref": "#/components/schemas/Scope",
-            "default": {}
           }
         },
         "type": "object",
@@ -600,7 +608,7 @@
           "question"
         ],
         "title": "ChatRequest",
-        "description": "A Question, in a new or an existing Conversation.\n\nAttributes:\n    conversation_id: The Conversation to continue; None starts one.\n    question: The Question.\n    scope: The Company and year chosen in the UI. Ones named in the Question win."
+        "description": "A Question, in a new or an existing Conversation.\n\nAttributes:\n    conversation_id: The Conversation to continue; None starts one.\n    question: The Question. Its Company and year are read from it, or from the\n        earlier Questions for a follow-up."
       },
       "Conversation": {
         "properties": {
@@ -680,7 +688,7 @@
         "title": "Evidence",
         "description": "A verbatim quote from a Report, the page it is on and where on the page.\n\nAttributes:\n    page: The page number, starting at 1.\n    quote: The sentence or table row that states the fact, copied verbatim.\n    boxes: Where the quote is: the boxes of the paragraph or table holding it, to highlight\n        it."
       },
-      "ExistingOut": {
+      "ExistingReportOut": {
         "properties": {
           "code": {
             "$ref": "#/components/schemas/ErrorCode"
@@ -694,7 +702,7 @@
           "code",
           "existing"
         ],
-        "title": "ExistingOut",
+        "title": "ExistingReportOut",
         "description": "An error about a stored report: a duplicate, or one still processing. Nothing was saved.\n\nAttributes:\n    existing: The stored report."
       },
       "Fte": {
@@ -747,7 +755,10 @@
         "enum": [
           "not_in_report",
           "report_not_ready",
-          "no_report"
+          "no_report",
+          "no_company_named",
+          "no_matching_report",
+          "unsupported_topic"
         ],
         "title": "NotFoundReason",
         "description": "Why a Question has no Answer."
@@ -801,17 +812,17 @@
             "type": "string",
             "title": "Company Name"
           },
-          "year": {
+          "reporting_year": {
             "type": "integer",
-            "title": "Year"
+            "title": "Reporting Year"
           },
           "sha256": {
             "type": "string",
             "title": "Sha256"
           },
-          "pages": {
+          "page_count": {
             "type": "integer",
-            "title": "Pages"
+            "title": "Page Count"
           },
           "status": {
             "$ref": "#/components/schemas/ReportStatus"
@@ -831,13 +842,13 @@
         "required": [
           "report_id",
           "company_name",
-          "year",
+          "reporting_year",
           "sha256",
-          "pages",
+          "page_count",
           "status"
         ],
         "title": "Report",
-        "description": "One Company's annual report for one Reporting Year.\n\nAttributes:\n    report_id: The report's id. Kept when the report is replaced.\n    company_name: The Company, spelled as it was first entered for any report.\n    year: The Reporting Year.\n    sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.\n    pages: The number of pages.\n    status: Where it is in processing.\n    failure: Why processing failed; None unless `status` is failed."
+        "description": "One Company's annual report for one Reporting Year.\n\nAttributes:\n    report_id: The report's id. Kept when the report is replaced.\n    company_name: The Company, spelled as it was first entered for any report.\n    reporting_year: The Reporting Year.\n    sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.\n    page_count: The number of pages.\n    status: Where it is in processing.\n    failure: Why processing failed; None unless `status` is failed."
       },
       "ReportDetail": {
         "properties": {
@@ -850,17 +861,17 @@
             "type": "string",
             "title": "Company Name"
           },
-          "year": {
+          "reporting_year": {
             "type": "integer",
-            "title": "Year"
+            "title": "Reporting Year"
           },
           "sha256": {
             "type": "string",
             "title": "Sha256"
           },
-          "pages": {
+          "page_count": {
             "type": "integer",
-            "title": "Pages"
+            "title": "Page Count"
           },
           "status": {
             "$ref": "#/components/schemas/ReportStatus"
@@ -897,9 +908,9 @@
         "required": [
           "report_id",
           "company_name",
-          "year",
+          "reporting_year",
           "sha256",
-          "pages",
+          "page_count",
           "status",
           "fte",
           "goals"
@@ -918,6 +929,31 @@
         "title": "ReportFailure",
         "description": "Why processing failed. The UI words it for the user."
       },
+      "ReportRef": {
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Report Id"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "reporting_year": {
+            "type": "integer",
+            "title": "Reporting Year"
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_id",
+          "company_name",
+          "reporting_year"
+        ],
+        "title": "ReportRef",
+        "description": "A stored report, named the way the UI shows it.\n\nAttributes:\n    report_id: The report's id.\n    company_name: Its Company.\n    reporting_year: Its Reporting Year."
+      },
       "ReportStatus": {
         "type": "string",
         "enum": [
@@ -927,35 +963,6 @@
         ],
         "title": "ReportStatus",
         "description": "Where a Report is in processing. Processing runs in the background after the upload."
-      },
-      "Scope": {
-        "properties": {
-          "company": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Company"
-          },
-          "reporting_year": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reporting Year"
-          }
-        },
-        "type": "object",
-        "title": "Scope",
-        "description": "Which reports a Question searches. None means any.\n\nAttributes:\n    company: The Company.\n    reporting_year: The Reporting Year."
       },
       "SustainabilityGoal": {
         "properties": {
@@ -1021,8 +1028,13 @@
             "type": "string",
             "title": "Question"
           },
-          "scope": {
-            "$ref": "#/components/schemas/Scope"
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/ReportRef"
+            },
+            "type": "array",
+            "title": "Reports",
+            "default": []
           },
           "answer": {
             "$ref": "#/components/schemas/Answer"
@@ -1031,11 +1043,10 @@
         "type": "object",
         "required": [
           "question",
-          "scope",
           "answer"
         ],
         "title": "Turn",
-        "description": "One Question and its Answer.\n\nAttributes:\n    question: As the user typed it.\n    scope: The scope it searched, after reading the Company and year from the Question.\n    answer: The Answer."
+        "description": "One Question and its Answer.\n\nAttributes:\n    question: As the user typed it.\n    reports: The reports the Question was matched to and answered from; empty if none\n        matched.\n    answer: The Answer."
       },
       "ValidationError": {
         "properties": {

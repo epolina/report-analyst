@@ -24,7 +24,7 @@ export interface paths {
          *         settings: The app settings.
          *         service: Stores the report, then extracts its FTE and goals.
          *         file: The annual report PDF.
-         *         company: The Company the report belongs to, as entered by the user.
+         *         company_name: The Company the report belongs to, as entered by the user.
          *         reporting_year: The Reporting Year the report covers.
          *         on_duplicate: What to do when a report for this Company and year is stored; None asks
          *             first with a 409 `same_company_year`.
@@ -134,7 +134,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/reports/{report_id}/pages/{number}": {
+    "/reports/{report_id}/pages/{page_number}": {
         parameters: {
             query?: never;
             header?: never;
@@ -147,7 +147,7 @@ export interface paths {
          *
          *     Args:
          *         report_id: The report's id.
-         *         number: The page number, starting at 1.
+         *         page_number: The page number, starting at 1.
          *         repository: Where the page images are stored.
          *
          *     Returns:
@@ -156,7 +156,7 @@ export interface paths {
          *     Raises:
          *         ApiError: 404 `page_not_found`, also for an unknown report.
          */
-        get: operations["get_page_reports__report_id__pages__number__get"];
+        get: operations["get_page_reports__report_id__pages__page_number__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -176,9 +176,10 @@ export interface paths {
         put?: never;
         /**
          * Ask
-         * @description Answer a Question from the reports in scope, with verbatim Evidence, or say Not Found.
+         * @description Answer a Question about the FTE or Sustainability Goals, with verbatim Evidence.
          *
-         *     Not Found is a normal answer (`kind: "not_found"`), not an error. Takes about 5-15 s.
+         *     Not Found is a normal answer (`kind: "not_found"`), not an error: also for a Company
+         *     or year with no stored report, or a Question about anything else. Takes about 5-15 s.
          *
          *     Args:
          *         request: The Question.
@@ -264,6 +265,8 @@ export interface components {
          *             asking Claude, which the UI words from `reason`.
          *         evidence: At least one for an answer; none for Not Found.
          *         reason: Why it wasn't found; None for an answer.
+         *         missing: For `no_matching_report`, what the Question names that isn't stored, e.g.
+         *             "ABN AMRO 2023"; empty otherwise.
          */
         Answer: {
             /**
@@ -279,25 +282,30 @@ export interface components {
              */
             evidence: components["schemas"]["ChatEvidence"][];
             reason?: components["schemas"]["NotFoundReason"] | null;
+            /**
+             * Missing
+             * @default []
+             */
+            missing: string[];
         };
         /** Body_upload_uploads_post */
         Body_upload_uploads_post: {
             /** File */
             file: string;
-            /** Company */
-            company: string;
+            /** Company Name */
+            company_name: string;
             /** Reporting Year */
             reporting_year: number;
             on_duplicate?: components["schemas"]["OnDuplicate"] | null;
         };
         /**
          * ChatEvidence
-         * @description Evidence for an Answer, naming its report, since one Question can search several.
+         * @description Evidence for an Answer, naming its report, since one Question can be about several.
          *
          *     Attributes:
          *         report_id: The report the quote is from.
          *         company_name: Its Company.
-         *         year: Its Reporting Year.
+         *         reporting_year: Its Reporting Year.
          */
         ChatEvidence: {
             /** Page */
@@ -313,8 +321,8 @@ export interface components {
             report_id: string;
             /** Company Name */
             company_name: string;
-            /** Year */
-            year: number;
+            /** Reporting Year */
+            reporting_year: number;
         };
         /**
          * ChatReply
@@ -326,7 +334,11 @@ export interface components {
         ChatReply: {
             /** Question */
             question: string;
-            scope: components["schemas"]["Scope"];
+            /**
+             * Reports
+             * @default []
+             */
+            reports: components["schemas"]["ReportRef"][];
             answer: components["schemas"]["Answer"];
             /**
              * Conversation Id
@@ -340,16 +352,14 @@ export interface components {
          *
          *     Attributes:
          *         conversation_id: The Conversation to continue; None starts one.
-         *         question: The Question.
-         *         scope: The Company and year chosen in the UI. Ones named in the Question win.
+         *         question: The Question. Its Company and year are read from it, or from the
+         *             earlier Questions for a follow-up.
          */
         ChatRequest: {
             /** Conversation Id */
             conversation_id?: string | null;
             /** Question */
             question: string;
-            /** @default {} */
-            scope: components["schemas"]["Scope"];
         };
         /**
          * Conversation
@@ -406,13 +416,13 @@ export interface components {
             boxes: components["schemas"]["PageBox"][];
         };
         /**
-         * ExistingOut
+         * ExistingReportOut
          * @description An error about a stored report: a duplicate, or one still processing. Nothing was saved.
          *
          *     Attributes:
          *         existing: The stored report.
          */
-        ExistingOut: {
+        ExistingReportOut: {
             code: components["schemas"]["ErrorCode"];
             existing: components["schemas"]["Report"];
         };
@@ -447,7 +457,7 @@ export interface components {
          * @description Why a Question has no Answer.
          * @enum {string}
          */
-        NotFoundReason: "not_in_report" | "report_not_ready" | "no_report";
+        NotFoundReason: "not_in_report" | "report_not_ready" | "no_report" | "no_company_named" | "no_matching_report" | "unsupported_topic";
         /**
          * OnDuplicate
          * @description What the user chose for an upload with the Company and year of a stored report.
@@ -481,9 +491,9 @@ export interface components {
          *     Attributes:
          *         report_id: The report's id. Kept when the report is replaced.
          *         company_name: The Company, spelled as it was first entered for any report.
-         *         year: The Reporting Year.
+         *         reporting_year: The Reporting Year.
          *         sha256: The SHA-256 hash of the PDF, to spot the same file uploaded again.
-         *         pages: The number of pages.
+         *         page_count: The number of pages.
          *         status: Where it is in processing.
          *         failure: Why processing failed; None unless `status` is failed.
          */
@@ -495,12 +505,12 @@ export interface components {
             report_id: string;
             /** Company Name */
             company_name: string;
-            /** Year */
-            year: number;
+            /** Reporting Year */
+            reporting_year: number;
             /** Sha256 */
             sha256: string;
-            /** Pages */
-            pages: number;
+            /** Page Count */
+            page_count: number;
             status: components["schemas"]["ReportStatus"];
             failure?: components["schemas"]["ReportFailure"] | null;
         };
@@ -520,12 +530,12 @@ export interface components {
             report_id: string;
             /** Company Name */
             company_name: string;
-            /** Year */
-            year: number;
+            /** Reporting Year */
+            reporting_year: number;
             /** Sha256 */
             sha256: string;
-            /** Pages */
-            pages: number;
+            /** Page Count */
+            page_count: number;
             status: components["schemas"]["ReportStatus"];
             failure?: components["schemas"]["ReportFailure"] | null;
             fte: components["schemas"]["Fte"] | null;
@@ -539,25 +549,31 @@ export interface components {
          */
         ReportFailure: "unreadable_pdf" | "facts_failed" | "interrupted" | "unexpected";
         /**
+         * ReportRef
+         * @description A stored report, named the way the UI shows it.
+         *
+         *     Attributes:
+         *         report_id: The report's id.
+         *         company_name: Its Company.
+         *         reporting_year: Its Reporting Year.
+         */
+        ReportRef: {
+            /**
+             * Report Id
+             * Format: uuid
+             */
+            report_id: string;
+            /** Company Name */
+            company_name: string;
+            /** Reporting Year */
+            reporting_year: number;
+        };
+        /**
          * ReportStatus
          * @description Where a Report is in processing. Processing runs in the background after the upload.
          * @enum {string}
          */
         ReportStatus: "processing" | "success" | "failed";
-        /**
-         * Scope
-         * @description Which reports a Question searches. None means any.
-         *
-         *     Attributes:
-         *         company: The Company.
-         *         reporting_year: The Reporting Year.
-         */
-        Scope: {
-            /** Company */
-            company?: string | null;
-            /** Reporting Year */
-            reporting_year?: number | null;
-        };
         /**
          * SustainabilityGoal
          * @description A sustainability target the Company has set.
@@ -596,13 +612,18 @@ export interface components {
          *
          *     Attributes:
          *         question: As the user typed it.
-         *         scope: The scope it searched, after reading the Company and year from the Question.
+         *         reports: The reports the Question was matched to and answered from; empty if none
+         *             matched.
          *         answer: The Answer.
          */
         Turn: {
             /** Question */
             question: string;
-            scope: components["schemas"]["Scope"];
+            /**
+             * Reports
+             * @default []
+             */
+            reports: components["schemas"]["ReportRef"][];
             answer: components["schemas"]["Answer"];
         };
         /** ValidationError */
@@ -655,7 +676,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExistingOut"];
+                    "application/json": components["schemas"]["ExistingReportOut"];
                 };
             };
             /** @description Content Too Large */
@@ -796,13 +817,13 @@ export interface operations {
             };
         };
     };
-    get_page_reports__report_id__pages__number__get: {
+    get_page_reports__report_id__pages__page_number__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 report_id: string;
-                number: number;
+                page_number: number;
             };
             cookie?: never;
         };

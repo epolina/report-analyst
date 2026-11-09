@@ -1,11 +1,10 @@
 // The "Add a report" popup: the user picks the PDF and types the Company and Reporting Year.
 import { useState, type FormEvent } from "react";
-import { ApiError, uploadReport, type Duplicate, type OnDuplicate, type Report } from "./api";
-import { ERROR } from "./messages";
-import { Button, Dialog, Field, Note } from "./ui";
+import { ApiError, ERROR_MESSAGES, uploadReport, type Duplicate, type OnDuplicate, type Report } from "../api";
+import { Button, Dialog, Field, Note } from "../ui";
 
 // Checked before sending, so the common mistakes don't need a round trip. The backend checks again.
-function validate(file: File | undefined, company: string, year: string): string {
+function validateUpload(file: File | undefined, company: string, year: string): string {
   if (!file) return "Choose the PDF to add.";
   if (!company.trim()) return "Enter the company name.";
   if (!/^\d{4}$/.test(year.trim())) return "Enter the reporting year as four digits, like 2024.";
@@ -31,7 +30,7 @@ export function UploadDialog({
   const [duplicate, setDuplicate] = useState<Duplicate>();
 
   // Any edit means a new upload, so the error and the duplicate question no longer apply.
-  function edited() {
+  function clearErrors() {
     setError("");
     setDuplicate(undefined);
   }
@@ -40,18 +39,18 @@ export function UploadDialog({
     setFile(undefined);
     setCompany("");
     setYear("");
-    edited();
+    clearErrors();
     onClose();
   }
 
-  async function send(onDuplicate?: OnDuplicate) {
-    const invalid = validate(file, company, year);
-    if (invalid) return setError(invalid);
+  async function sendUpload(onDuplicate?: OnDuplicate) {
+    const validationError = validateUpload(file, company, year);
+    if (validationError) return setError(validationError);
     setBusy(true);
     try {
-      const upload = await uploadReport(file!, company.trim(), Number(year), onDuplicate);
+      const uploadedReport = await uploadReport(file!, company.trim(), Number(year), onDuplicate);
       setBusy(false);
-      onUploaded(upload);
+      onUploaded(uploadedReport);
       close();
     } catch (err) {
       const code = err instanceof ApiError ? err.body?.code : undefined;
@@ -64,7 +63,7 @@ export function UploadDialog({
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (duplicate?.code === "same_file") return close();
-    send(duplicate ? "replace" : undefined);
+    sendUpload(duplicate ? "replace" : undefined);
   }
 
   return (
@@ -87,7 +86,7 @@ export function UploadDialog({
           </Button>
         ) : duplicate ? (
           <>
-            <Button onClick={() => send("keep_both")}>Keep both</Button>
+            <Button onClick={() => sendUpload("keep_both")}>Keep both</Button>
             <Button type="submit" variant="primary">
               Replace
             </Button>
@@ -111,7 +110,7 @@ export function UploadDialog({
         key={String(open)}
         onChange={(e) => {
           setFile(e.target.files?.[0]);
-          edited();
+          clearErrors();
         }}
       />
       <Field
@@ -122,7 +121,7 @@ export function UploadDialog({
         value={company}
         onChange={(e) => {
           setCompany(e.target.value);
-          edited();
+          clearErrors();
         }}
       />
       <Field
@@ -134,14 +133,14 @@ export function UploadDialog({
         value={year}
         onChange={(e) => {
           setYear(e.target.value);
-          edited();
+          clearErrors();
         }}
       />
       {duplicate && !busy && (
         <Note tone="warn">
           {duplicate.code === "same_file"
-            ? ERROR.same_file(duplicate)
-            : `${ERROR.same_company_year(duplicate)} Replace it?`}
+            ? ERROR_MESSAGES.same_file(duplicate)
+            : `${ERROR_MESSAGES.same_company_year(duplicate)} Replace it?`}
         </Note>
       )}
       {error && <Note tone="bad">{error}</Note>}

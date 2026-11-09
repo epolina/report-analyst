@@ -62,27 +62,29 @@ class FakePdfExtractor(PdfExtractor):
 
 
 class FakeLLM:
-    """Records prompts. `complete` validates `answer` (a dict) against the schema, with the
-    context the real call would get, or gives an empty instance; `cite` returns `cited`. No
-    API calls."""
+    """Records prompts. `complete` validates the schema's entry in `answers`, else `answer`
+    (a dict), against the schema, with the context the real call would get, or gives an empty
+    instance; `cite` returns `cited`. No API calls."""
 
     def __init__(self) -> None:
         self.answer: dict[str, Any] | None = None
+        self.answers: dict[type[BaseModel], dict[str, Any]] = {}  # by schema, over `answer`
         self.cited = CitedAnswer(text="", citations=[])  # what `cite` returns
         self.prompts: list[str] = []
-        self.documents: list[tuple[str, str | list[str]]] = []  # what the last `cite` was given
+        self.documents: list[tuple[str, str]] = []  # what the last `cite` was given
 
-    def cite(self, prompt: str, documents: list[tuple[str, str | list[str]]]) -> CitedAnswer:
+    def cite(self, prompt: str, documents: list[tuple[str, str]]) -> CitedAnswer:
         self.prompts.append(prompt)
         self.documents = documents
         return self.cited
 
     def complete(self, prompt: str, schema: type[BaseModel], context: Any = None) -> BaseModel:
         self.prompts.append(prompt)
-        if self.answer is None:
+        answer = self.answers.get(schema, self.answer)
+        if answer is None:
             return schema()
         try:
-            return schema.model_validate(self.answer, context=context)
+            return schema.model_validate(answer, context=context)
         except ValidationError as error:  # the real one retries, then gives up like this
             raise LLMError(str(error)) from error
 
@@ -108,14 +110,14 @@ class ImmediateJobs:
 @pytest.fixture(autouse=True)
 def immediate_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
     """Process uploads straight away, so a test sees the report ready after the request."""
-    monkeypatch.setattr(service, "_JOBS", ImmediateJobs())
+    monkeypatch.setattr(service, "_PROCESSING_QUEUE", ImmediateJobs())
 
 
 @pytest.fixture
 def held_jobs(monkeypatch: pytest.MonkeyPatch) -> HeldJobs:
     """Keep jobs queued until the test calls `run`, to see a report while it's processing."""
     jobs = HeldJobs()
-    monkeypatch.setattr(service, "_JOBS", jobs)
+    monkeypatch.setattr(service, "_PROCESSING_QUEUE", jobs)
     return jobs
 
 
@@ -162,7 +164,7 @@ def upload(client: TestClient, pdf: bytes, **form: str) -> Response:
     return client.post(
         "/uploads",
         files={"file": ("shell-2024.pdf", pdf)},
-        data={"company": "Shell", "reporting_year": "2024", **form},
+        data={"company_name": "Shell", "reporting_year": "2024", **form},
     )
 
 

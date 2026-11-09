@@ -1,7 +1,7 @@
 // The inline SVG icons the components share.
 import { type ReactNode } from "react";
 
-const icon = (d: ReactNode) => (
+const icon = (paths: ReactNode) => (
   <svg
     className="ui-icon"
     viewBox="0 0 24 24"
@@ -12,7 +12,7 @@ const icon = (d: ReactNode) => (
     strokeLinejoin="round"
     aria-hidden="true"
   >
-    {d}
+    {paths}
   </svg>
 );
 

@@ -1,6 +1,7 @@
 // The Reports drawer: the list with its filters, or one report with its FTE, goals and PDF.
 import { useEffect, useState } from "react";
 import {
+  failureMessage,
   getReport,
   isProcessing,
   retryReport,
@@ -8,13 +9,12 @@ import {
   type Report,
   type ReportDetail,
   type ReportStatus,
-} from "./api";
-import { failureMessage } from "./messages";
+} from "../api";
 import { ADD_REPORT, ALL_COMPANIES, ANY_YEAR, companiesOf, unique, yearsOf } from "./options";
 import { ReportView } from "./ReportView";
 import {
   Button,
-  DropButton,
+  AddFileButton,
   EmptyText,
   Filters,
   GroupTable,
@@ -25,15 +25,15 @@ import {
   Skeleton,
   Status,
   type TableGroup,
-} from "./ui";
+} from "../ui";
 
-const STATUS: Record<ReportStatus, { tone: "ok" | "busy" | "bad"; label: string }> = {
+const STATUS_BADGES: Record<ReportStatus, { tone: "ok" | "busy" | "bad"; label: string }> = {
   processing: { tone: "busy", label: "Processing" },
   success: { tone: "ok", label: "Ready" },
   failed: { tone: "bad", label: "Failed" },
 };
 
-const statusOf = (r: Report) => <Status tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Status>;
+const statusBadge = (r: Report) => <Status tone={STATUS_BADGES[r.status].tone}>{STATUS_BADGES[r.status].label}</Status>;
 
 // Reports grouped by Company (A–Z), newest year first within each.
 function groupByCompany(reports: Report[]): TableGroup[] {
@@ -44,8 +44,8 @@ function groupByCompany(reports: Report[]): TableGroup[] {
       label: company,
       rows: reports
         .filter((r) => r.company_name === company)
-        .sort((a, b) => b.year - a.year)
-        .map((r) => ({ key: r.report_id, cells: [r.year, statusOf(r)] })),
+        .sort((a, b) => b.reporting_year - a.reporting_year)
+        .map((r) => ({ key: r.report_id, cells: [r.reporting_year, statusBadge(r)] })),
     }));
 }
 
@@ -54,7 +54,7 @@ function BusyNote({ report }: { report?: Report }) {
   return (
     report && (
       <EmptyText>
-        One report at a time: {report.company_name} {report.year} is processing.
+        One report at a time: {report.company_name} {report.reporting_year} is processing.
       </EmptyText>
     )
   );
@@ -63,9 +63,9 @@ function BusyNote({ report }: { report?: Report }) {
 export function ReportsDrawer({
   reports,
   error,
-  busyReport,
-  selected,
-  focus,
+  processingReport,
+  selectedReport,
+  focusedEvidence,
   onSelect,
   onAdd,
   onRetried,
@@ -73,24 +73,24 @@ export function ReportsDrawer({
 }: {
   reports: Report[];
   error: string; // why the list couldn't be loaded
-  busyReport?: Report;
-  selected?: Report;
-  focus?: ChatEvidence; // Evidence clicked in the chat, shown at its page
+  processingReport?: Report;
+  selectedReport?: Report;
+  focusedEvidence?: ChatEvidence; // Evidence clicked in the chat, shown at its page
   onSelect: (reportId: string | undefined) => void;
   onAdd: () => void;
   onRetried: () => void;
   onAsk: (report: ReportDetail) => void;
 }) {
   // Kept here, not in the list, so the filters survive opening a report and coming back.
-  const [company, setCompany] = useState("");
-  const [year, setYear] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
+  const [yearFilter, setYearFilter] = useState("");
 
-  if (selected) {
+  if (selectedReport) {
     return (
       <ReportPane
-        report={selected}
-        busyReport={busyReport}
-        focus={focus}
+        report={selectedReport}
+        processingReport={processingReport}
+        focusedEvidence={focusedEvidence}
         onBack={() => onSelect(undefined)}
         onRetried={onRetried}
         onAsk={onAsk}
@@ -99,14 +99,18 @@ export function ReportsDrawer({
   }
 
   const groups = groupByCompany(
-    reports.filter((r) => (!company || r.company_name === company) && (!year || String(r.year) === year)),
+    reports.filter(
+      (r) =>
+        (!companyFilter || r.company_name === companyFilter) &&
+        (!yearFilter || String(r.reporting_year) === yearFilter),
+    ),
   );
   return (
     <Pane title="Reports">
-      <DropButton disabled={busyReport !== undefined} onClick={onAdd}>
+      <AddFileButton disabled={processingReport !== undefined} onClick={onAdd}>
         {ADD_REPORT}
-      </DropButton>
-      <BusyNote report={busyReport} />
+      </AddFileButton>
+      <BusyNote report={processingReport} />
       {error && <Note tone="bad">{error}</Note>}
       {reports.length > 0 && (
         <>
@@ -115,15 +119,15 @@ export function ReportsDrawer({
               aria-label="Filter by company"
               allLabel={ALL_COMPANIES}
               options={companiesOf(reports)}
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
+              value={companyFilter}
+              onChange={(e) => setCompanyFilter(e.target.value)}
             />
             <Select
               aria-label="Filter by year"
               allLabel={ANY_YEAR}
               options={yearsOf(reports)}
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
+              value={yearFilter}
+              onChange={(e) => setYearFilter(e.target.value)}
             />
           </Filters>
           {groups.length ? (
@@ -140,21 +144,21 @@ export function ReportsDrawer({
 // One report: its status, Retry when it failed, and its FTE, goals and PDF once it's ready.
 function ReportPane({
   report,
-  busyReport,
-  focus,
+  processingReport,
+  focusedEvidence,
   onBack,
   onRetried,
   onAsk,
 }: {
   report: Report;
-  busyReport?: Report;
-  focus?: ChatEvidence;
+  processingReport?: Report;
+  focusedEvidence?: ChatEvidence;
   onBack: () => void;
   onRetried: () => void;
   onAsk: (report: ReportDetail) => void;
 }) {
-  const [loaded, setLoaded] = useState<{ key: string; detail?: ReportDetail; error?: string }>();
-  const [failure, setFailure] = useState<{ id: string; message: string }>();
+  const [detailLoad, setDetailLoad] = useState<{ key: string; detail?: ReportDetail; error?: string }>();
+  const [retryFailure, setRetryFailure] = useState<{ id: string; message: string }>();
 
   // Load the report's facts once it's ready, also when it turns ready while open. Keyed by
   // the PDF's hash too, so a replaced report never shows its old facts.
@@ -162,32 +166,32 @@ function ReportPane({
   const reportId = report.report_id;
   useEffect(() => {
     if (!detailKey) return;
-    let current = true; // a load that answers after the user moved on is dropped
+    let isCurrent = true; // a load that answers after the user moved on is dropped
     getReport(reportId)
-      .then((d) => current && setLoaded({ key: detailKey, detail: d }))
-      .catch((e: Error) => current && setLoaded({ key: detailKey, error: e.message }));
+      .then((loadedDetail) => isCurrent && setDetailLoad({ key: detailKey, detail: loadedDetail }))
+      .catch((e: Error) => isCurrent && setDetailLoad({ key: detailKey, error: e.message }));
     return () => {
-      current = false;
+      isCurrent = false;
     };
   }, [detailKey, reportId]);
-  const shown = detailKey && loaded?.key === detailKey ? loaded : undefined;
-  const detail = shown?.detail;
-  const detailError = shown?.error;
-  const retryError = failure?.id === reportId ? failure.message : undefined;
+  const currentLoad = detailKey && detailLoad?.key === detailKey ? detailLoad : undefined;
+  const detail = currentLoad?.detail;
+  const detailError = currentLoad?.error;
+  const retryError = retryFailure?.id === reportId ? retryFailure.message : undefined;
 
   function retry() {
-    setFailure(undefined);
+    setRetryFailure(undefined);
     retryReport(reportId)
       .then(onRetried)
-      .catch((e: Error) => setFailure({ id: reportId, message: e.message }));
+      .catch((e: Error) => setRetryFailure({ id: reportId, message: e.message }));
   }
 
   return (
     <Pane
-      title={`${report.company_name} ${report.year}`}
+      title={`${report.company_name} ${report.reporting_year}`}
       subtitle={
         <>
-          {statusOf(report)} · {report.pages} pages
+          {statusBadge(report)} · {report.page_count} pages
         </>
       }
       back={{ label: "All reports", onClick: onBack }}
@@ -202,11 +206,11 @@ function ReportPane({
         <>
           <Note tone="bad">{failureMessage(report)}</Note>
           <div>
-            <Button disabled={busyReport !== undefined} onClick={retry}>
+            <Button disabled={processingReport !== undefined} onClick={retry}>
               Retry
             </Button>
           </div>
-          <BusyNote report={busyReport} />
+          <BusyNote report={processingReport} />
           {retryError && <Note tone="bad">{retryError}</Note>}
         </>
       )}
@@ -216,10 +220,10 @@ function ReportPane({
       )}
       {detail && (
         <ReportView
-          // A new focus (another Evidence clicked in the chat) starts the view afresh.
-          key={`${detail.report_id}:${focus?.quote}`}
+          // New focused Evidence (another one clicked in the chat) starts the view afresh.
+          key={`${detail.report_id}:${focusedEvidence?.quote}`}
           report={detail}
-          focus={focus?.report_id === detail.report_id ? focus : undefined}
+          focusedEvidence={focusedEvidence?.report_id === detail.report_id ? focusedEvidence : undefined}
           onAsk={() => onAsk(detail)}
         />
       )}

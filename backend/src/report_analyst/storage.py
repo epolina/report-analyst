@@ -15,6 +15,6 @@ def write_atomic(path: Path, data: bytes) -> None:
         path: The file.
         data: Its new contents.
     """
-    tmp = path.with_name(f"{path.name}.{uuid4().hex}.tmp")
-    tmp.write_bytes(data)
-    tmp.replace(path)
+    temp_path = path.with_name(f"{path.name}.{uuid4().hex}.tmp")
+    temp_path.write_bytes(data)
+    temp_path.replace(path)

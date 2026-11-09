@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from report_analyst.reports import ReportRepository, fail_interrupted
+from report_analyst.reports import ReportRepository, fail_interrupted_reports
 from report_analyst.routers import chat, health, reports, uploads
 from report_analyst.routers.dependencies import get_settings
 from report_analyst.routers.errors import ApiError, handle_api_error
@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     get_settings()
     # Uses the settings override when one is set.
     settings = app.dependency_overrides.get(get_settings, get_settings)()
-    fail_interrupted(ReportRepository(settings.reports_dir))
+    fail_interrupted_reports(ReportRepository(settings.reports_dir))
     yield
 
 

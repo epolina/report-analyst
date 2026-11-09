@@ -6,16 +6,16 @@ import App from "./App";
 const REPORT = {
   report_id: "r1",
   company_name: "Shell",
-  year: 2024,
+  reporting_year: 2024,
   sha256: "abc",
-  pages: 1,
+  page_count: 1,
   status: "success",
   failure: null,
 };
 const REPLY = {
   conversation_id: "c1",
   question: "How many FTE?",
-  scope: { company: "Shell", reporting_year: 2024 },
+  reports: [{ report_id: "r1", company_name: "Shell", reporting_year: 2024 }],
   answer: {
     kind: "answer",
     text: "Shell had 12,345 FTE.",
@@ -24,7 +24,7 @@ const REPLY = {
   },
 };
 
-function json(status: number, body: unknown) {
+function jsonResponse(status: number, body: unknown) {
   return Promise.resolve(new Response(JSON.stringify(body), { status }));
 }
 
@@ -41,7 +41,7 @@ afterEach(() => {
 test("asking, then starting a new chat, keeps the app on screen", async () => {
   vi.stubGlobal(
     "fetch",
-    vi.fn((url: string) => (url.endsWith("/chat") ? json(200, REPLY) : json(200, [REPORT]))),
+    vi.fn((url: string) => (url.endsWith("/chat") ? jsonResponse(200, REPLY) : jsonResponse(200, [REPORT]))),
   );
   render(<App />);
 
@@ -51,4 +51,29 @@ test("asking, then starting a new chat, keeps the app on screen", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: "New chat" }));
   expect(await screen.findByText("What do you want to know?")).toBeTruthy();
+});
+
+test("an answer shows the reports it was matched to, and a missing report is named", async () => {
+  const missing = {
+    ...REPLY,
+    question: "Compare Shell 2024 and ABN AMRO 2023",
+    answer: { kind: "not_found", text: "", evidence: [], reason: "no_matching_report", missing: ["ABN AMRO 2023"] },
+  };
+  const replies = [REPLY, missing];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string) => (url.endsWith("/chat") ? jsonResponse(200, replies.shift()) : jsonResponse(200, [REPORT]))),
+  );
+  render(<App />);
+
+  for (const question of ["How many FTE?", "Compare Shell 2024 and ABN AMRO 2023"]) {
+    fireEvent.change(await screen.findByLabelText("Question"), { target: { value: question } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    expect(await screen.findByText(question)).toBeTruthy();
+  }
+
+  expect(screen.getAllByText("Shell 2024").length).toBe(2); // under each Question
+  expect(
+    await screen.findByText("There's no report for ABN AMRO 2023. Add it, or ask about a stored one."),
+  ).toBeTruthy();
 });

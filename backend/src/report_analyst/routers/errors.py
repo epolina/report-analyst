@@ -40,7 +40,7 @@ class ErrorOut(BaseModel):
     code: ErrorCode
 
 
-class ExistingOut(ErrorOut):
+class ExistingReportOut(ErrorOut):
     """An error about a stored report: a duplicate, or one still processing. Nothing was saved.
 
     Attributes:
@@ -75,7 +75,7 @@ class ApiError(Exception):
         self.body = body
 
 
-def error(status: HTTPStatus, code: ErrorCode) -> ApiError:
+def api_error(status: HTTPStatus, code: ErrorCode) -> ApiError:
     """Build an error that carries only its code.
 
     Args:

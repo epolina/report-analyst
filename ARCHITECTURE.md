@@ -7,8 +7,8 @@ RAG system for analysing annual reports. Python backend, web frontend, runs loca
 Four layers, with the domain objects (see UBIQUITOUS_LANGUAGE.md) at the centre:
 
 1. **Domain** (`domain.py`): Report, Passage, Evidence, Facts. Pydantic models plus their rules (e.g. `plain`, `Passage.search_text`). They import nothing from the app except `pdf.Block` and `pdf.PageBox`, the text a Passage is made of and the shape of a highlight.
-2. **Generic tools** (`pdf/`, `index.py`, `embedder.py`, `llm.py`, `storage.py`): each wraps one library or job. `pdf/` holds `models.py` (Block, PageBox, ExtractionError), `mistral_extractor.py` (the `PdfExtractor` interface and Mistral OCR) and `rasterizer.py` (page count and page images, with pdfium). `storage.py` writes a file atomically. They know nothing about reports and import nothing from the app except `embedder.Vectors`.
-3. **Use cases** (`reports/`, `facts/`, `chat/`): `ReportService` adds and processes a report; `Retriever` embeds and searches its Passages. `FactExtractor` reads Facts out of a report and stores nothing. `ChatService` answers a Question from the reports in scope and stores the Conversation.
+2. **Generic tools** (`pdf/`, `search/`, `llm.py`, `storage.py`): each wraps one library or job. `pdf/` holds `models.py` (Block, PageBox, ExtractionError), `mistral_extractor.py` (the `PdfExtractor` interface and Mistral OCR) and `rasterizer.py` (page count and page images, with pdfium). `search/` holds `embedder.py` (the embedding model) and `index.py` (BM25 and the hybrid index). `storage.py` writes a file atomically. They know nothing about reports and import nothing from the app except `search.Vectors`.
+3. **Use cases** (`reports/`, `facts/`, `chat/`): `ReportService` adds and processes a report; `Retriever` embeds and searches its Passages. `FactExtractor` reads Facts out of a report and stores nothing. `ChatService` extracts what a Question asks about, finds the matching reports' Facts, answers from them and stores the Conversation.
 4. **HTTP** (`routers/`): parse input, call `ReportService` or `ChatService`, map their errors to a status and an `ErrorCode`; the UI words the code. A route that only reads what upload stored, with no logic on top, reads `ReportRepository` directly.
 
 Imports point one way: `routers → chat → reports → facts → domain + generic tools`.
@@ -30,27 +30,31 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
 │       ├── main.py             # the FastAPI app, routers, logging; start-up fails interrupted jobs
 │       ├── settings.py         # AppSettings from environment variables
 │       ├── domain.py           # Report, Passage, Evidence, Fte, SustainabilityGoal, Facts
-│       ├── embedder.py         # Embedder: bge-small via fastembed (ONNX), passages and queries
-│       ├── index.py            # BM25 + HybridIndex: keyword and embedding search, fused by rank
 │       ├── llm.py              # AnthropicLLM: structured output (Instructor) or cited text
 │       ├── storage.py          # write_atomic: write to a temporary file, then rename
+│       ├── search/
+│       │   ├── embedder.py     # Embedder: bge-small via fastembed (ONNX), passages and queries
+│       │   └── index.py        # BM25 + HybridIndex: keyword and embedding search, fused by rank
 │       ├── pdf/
 │       │   ├── models.py       # Block (heading/text/table, with its PageBox), ExtractionError
 │       │   ├── mistral_extractor.py  # PdfExtractor interface; MistralExtractor (Mistral OCR API)
-│       │   └── rasterizer.py   # page_count, render_pages (pdfium, one lock)
+│       │   └── rasterizer.py   # count_pages, render_pages (pdfium, one lock)
 │       ├── reports/
 │       │   ├── service.py      # ReportService: add (checks, duplicates) and the background job
 │       │   ├── repository.py   # ReportRepository: one folder per report
 │       │   ├── retriever.py    # Retriever: embeds Passages, searches them with a cached index
-│       │   ├── splitting.py    # split: Blocks into Passages for search
+│       │   ├── splitting.py    # split_into_passages: Blocks into Passages for search
 │       │   └── errors.py       # what can go wrong when adding a report
 │       ├── facts/
 │       │   ├── extractor.py    # FactExtractor: topic searches, then one Claude call
-│       │   └── answer.py       # the Facts as Claude writes them; checks each quote in its Passage
+│       │   └── model_output.py # the Facts as Claude writes them; checks each quote in its Passage
 │       ├── chat/
-│       │   ├── service.py      # ChatService: scope, search, Claude with citations; resolve_scope
+│       │   ├── service.py      # ChatService: the three steps in order, every check between them
+│       │   ├── filtering_fields.py   # step 1: extract_filtering_fields (Fact, Company-year pairs)
+│       │   ├── relevant_facts.py     # step 2: find_reports, collect_relevant_facts (no model)
+│       │   ├── answer_generation.py  # step 3: generate_answer, citing the Facts
 │       │   ├── repository.py   # ConversationRepository: one JSON file each
-│       │   └── models.py       # Scope, Answer, Turn, Conversation, ChatReply
+│       │   └── models.py       # ReportRef, Answer, Turn, Conversation, ChatReply
 │       └── routers/
 │           ├── dependencies.py # builds settings, tools, repositories and services
 │           ├── errors.py       # ErrorCode and the error bodies; ApiError and its handler
@@ -65,22 +69,29 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
     └── src/
         ├── main.tsx            # mounts App
         ├── App.tsx             # the layout, the report list and the drawer; shared state
-        ├── ChatPanel.tsx       # useChat, ChatComposer, ChatThread
-        ├── ReportsDrawer.tsx   # the list with filters, or one report with retry
-        ├── ReportView.tsx      # one ready report: its facts beside the page with the evidence
-        ├── UploadDialog.tsx    # the "Add a report" popup and its duplicate question
-        ├── api.ts, api.gen.ts  # backend calls; types generated from the OpenAPI schema
-        ├── options.ts          # labels and options shared by the filters and the chat scope
-        ├── messages.ts         # the user's wording for every error, failure and Not Found code
-        ├── *.test.tsx          # vitest: the upload dialog, and the app staying up through a chat
+        ├── App.test.tsx        # vitest: the app staying up through a chat
+        ├── api/                # import from "api": index.ts re-exports the two below
+        │   ├── client.ts, api.gen.ts  # backend calls; types generated from the OpenAPI schema
+        │   └── messages.ts     # the user's wording for every error, failure and Not Found code
+        ├── chat/
+        │   └── ChatPanel.tsx   # useChat, ChatComposer, ChatThread
+        ├── reports/
+        │   ├── ReportsDrawer.tsx  # the list with filters, or one report with retry
+        │   ├── ReportView.tsx  # one ready report: its facts beside the page with the evidence
+        │   ├── UploadDialog.tsx   # the "Add a report" popup and its duplicate question (+ test)
+        │   └── options.ts      # labels and options shared by the filters and the chat scope
         └── ui/                 # the component library: tokens.css, one .tsx + .css per area
 ```
 
 ## Chat
 
-Chat: a Question's Company and year come from its text when it names a stored one ("How much did SHELL spend … in 2025?"), otherwise from the selects under the composer; two named means a comparison, so that field searches all. The UI shows the scope searched and sets the selects to it, so a follow-up keeps it. Follow-ups also get the last three Turns in the prompt, and the previous Question joins the search query. Not Found is an Answer with a reason (`not_in_report`, `report_not_ready`, `no_report`).
+Chat answers only what processing extracted, the FTE and the Sustainability Goals. `ChatService._answer_question` runs three steps, one module each, and makes every check between them; a check that fails raises `QuestionNotAnsweredError`, which `ask` stores as a Not Found with its reason:
 
-Chat quotes come from the API's citations, not from the model's own copy: each Passage is a document, and the API returns the exact span cited, so a quote can't be misquoted. Prose is cited by sentence; a Passage with a Markdown table goes in one line per block, so Claude cites the rows it used. An answer citing nothing is Not Found, whatever its text says. Citations don't combine with structured output, which is why facts (which need typed fields) still use Instructor and check their quotes themselves. Conversations are JSON files, so they survive a restart; the browser keeps the open one's id to show it again.
+1. **Extract the filtering fields** (`filtering_fields.extract_filtering_fields`, structured output through Instructor). Claude gets the Question, the last three Questions and the stored reports (Company and year), and returns `FilteringFields`: the `fact` asked about (`fte`, `sustainability_goals`, or null for anything else) and the `company_year_pairs`. Since it sees the stored reports, it writes their Companies as stored ("ABN" is "ABN AMRO"); it gives a year only if the Question names one; a follow-up keeps the earlier Company. No fact is `unsupported_topic`; no pair is `no_company_named`.
+2. **Find the relevant Facts** (`relevant_facts.py`, in code, no model). `find_reports` matches each pair to the stored reports by Company (ignoring case) and year; a pair without a year is that Company's latest stored report. It returns the pairs with no report rather than raising, so `_answer_question` makes the check. A pair with no report is `no_matching_report`, naming it in `missing`; reports all still processing or failed are `report_not_ready`. The Facts of the kind asked about, from the ready reports, are the relevant Facts; none is `not_in_report`.
+3. **Generate the answer** (`answer_generation.py`, citations). Each relevant Fact is one document: the title names the report, page and fact ("ABN AMRO 2025, page 57: Sustainability goal: Net zero, deadline 2050", from `SustainabilityGoal.as_string`) and the content is its verbatim quote. The prompt lists the reports asked about with what was found in each; it sets no length or layout, only that the answer is plain text and comes from the documents. A cited Fact becomes Evidence with its own page and boxes, as in the report view. An answer citing nothing is `not_in_report`, whatever its text says.
+
+The UI shows the reports a Question was matched to under it. There are no Company or year selects: the Question, or the earlier ones for a follow-up, says which reports. The UI words every reason. Conversations are JSON files, so they survive a restart; the browser keeps the open one's id to show it again. Files stored before this still load: the old `scope` is ignored and `reports` defaults to empty.
 
 ## File roles
 
@@ -100,10 +111,10 @@ Chat quotes come from the API's citations, not from the model's own copy: each P
 
 ## Frontend
 
-- **API contract.** The backend's Pydantic models are the source of truth. `npm run gen:api` dumps FastAPI's OpenAPI schema to `frontend/openapi.json` and generates `src/api.gen.ts`; `api.ts` re-exports the types under domain names. Change a backend model, run `gen:api`, and `npm run typecheck` shows every place the UI must follow.
+- **API contract.** The backend's Pydantic models are the source of truth. `npm run gen:api` dumps FastAPI's OpenAPI schema to `frontend/openapi.json` and generates `src/api/api.gen.ts`; `api/client.ts` re-exports the types under domain names. Change a backend model, run `gen:api`, and `npm run typecheck` shows every place the UI must follow.
 - **Base path.** The browser calls `/api/uploads`; Vite (dev) and nginx (Docker) strip `/api` and forward to the backend, so there is no CORS.
 - **Design tokens.** All raw values live in `ui/tokens.css`. Each component file in `ui/` has its stylesheet next to it (`chat.css`, `list.css`, …), using only tokens, enforced by stylelint. Screens compose `ui/` components and never write CSS or class names. A new look means a new component in `ui/`, not a style in a screen.
-- **Screens.** `App.tsx` lays out the page and holds the state the chat and the drawer share; `ChatPanel.tsx` (the chat, with `useChat`) and `ReportsDrawer.tsx` (the list and one report) hold their own. `mockup/combined/b-chat-first.html` is the reference layout.
+- **Screens.** `App.tsx` lays out the page and holds the state the chat and the drawer share; `chat/ChatPanel.tsx` (the chat, with `useChat`) and `reports/ReportsDrawer.tsx` (the list and one report) hold their own. `mockup/combined/b-chat-first.html` is the reference layout.
 
 ## Persistence
 

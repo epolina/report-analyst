@@ -3,16 +3,16 @@
 from collections.abc import Callable
 
 from report_analyst.domain import Facts, Passage, Report
-from report_analyst.facts.answer import PASSAGES_KEY, FactsAnswer
+from report_analyst.facts.model_output import PASSAGES_CONTEXT_KEY, FactsOutput
 from report_analyst.llm import AnthropicLLM
 
 
-type Search = Callable[[str, int], list[Passage]]
-"""Finds up to `k` Passages of the report for a query, best first."""
+type PassageSearch = Callable[[str, int], list[Passage]]
+"""Finds up to `limit` Passages of the report for a query, best first."""
 
-# One search per kind of fact; the passages found are all Claude reads. Tune the queries (or k)
-# if a known goal goes missing.
-_QUERIES = [
+# One search per kind of fact; the passages found are all Claude reads. Tune the queries (or
+# _HITS_PER_QUERY) if a known goal goes missing.
+_FACT_SEARCH_QUERIES = [
     "total number of employees in full-time equivalents (FTE)",
     "greenhouse gas emissions reduction target net zero scope 1 2 3",
     "renewable energy and electricity target",
@@ -26,12 +26,13 @@ _QUERIES = [
 ]
 _HITS_PER_QUERY = 10
 
-_PROMPT = """\
-Below are passages from the {year} annual report of {company}, each with an id.
+_PROMPT_TEMPLATE = """\
+Below are passages from the {reporting_year} annual report of {company_name}, each with an id.
 
 Extract:
-1. fte: the Company's total number of FTEs (full-time equivalents) for {year}, for the whole
-   group. FTE is not headcount: if only a number of employees or people is given, leave it out.
+1. fte: the Company's total number of FTEs (full-time equivalents) for {reporting_year}, for the
+   whole group. FTE is not headcount: if only a number of employees or people is given, leave it
+   out.
 2. goals: every sustainability target the Company has set for itself, such as emissions,
    energy, water, packaging, sourcing, diversity or safety targets. List each goal once, even
    if several passages repeat it. Skip general aspirations with nothing to measure, and skip
@@ -55,7 +56,7 @@ class FactExtractor:
         """
         self._llm = llm
 
-    def extract(self, report: Report, search: Search) -> Facts:
+    def extract(self, report: Report, search: PassageSearch) -> Facts:
         """Extract a Report's Facts with one Claude call.
 
         Every fact cites a Passage it was shown; an answer citing one it wasn't goes back to
@@ -72,17 +73,23 @@ class FactExtractor:
         Raises:
             LLMError: The model call failed or gave no valid answer.
         """
-        found = {p.index: p for q in _QUERIES for p in search(q, _HITS_PER_QUERY)}
-        passages = dict(sorted(found.items()))  # reading order
+        passages_by_index = {
+            passage.index: passage
+            for query in _FACT_SEARCH_QUERIES
+            for passage in search(query, _HITS_PER_QUERY)
+        }
+        passages = dict(sorted(passages_by_index.items()))  # reading order
         if not passages:
             return Facts()
-        prompt = _PROMPT.format(
-            company=report.company_name,
-            year=report.year,
+        prompt = _PROMPT_TEMPLATE.format(
+            company_name=report.company_name,
+            reporting_year=report.reporting_year,
             passages="\n\n".join(
                 f'<passage id="{i}" page="{p.page}">\n{p.text}\n</passage>'
                 for i, p in passages.items()
             ),
         )
-        answer = self._llm.complete(prompt, FactsAnswer, context={PASSAGES_KEY: passages})
-        return answer.facts(passages)
+        model_output = self._llm.complete(
+            prompt, FactsOutput, context={PASSAGES_CONTEXT_KEY: passages}
+        )
+        return model_output.to_facts(passages)

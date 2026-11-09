@@ -10,11 +10,11 @@ def test_list_reports_sorted_by_company_then_year(
 ) -> None:
     assert client.get("/reports").json() == []
     for company, year in [("Shell", "2024"), ("ASML", "2025"), ("Shell", "2023")]:
-        upload(client, make_pdf(f"{company} {year}"), company=company, reporting_year=year)
+        upload(client, make_pdf(f"{company} {year}"), company_name=company, reporting_year=year)
 
     body = client.get("/reports").json()
 
-    assert [(r["company_name"], r["year"]) for r in body] == [
+    assert [(r["company_name"], r["reporting_year"]) for r in body] == [
         ("ASML", 2025),
         ("Shell", 2023),
         ("Shell", 2024),
@@ -46,7 +46,7 @@ def test_upload_extracts_verified_facts_once(
     body = client.get(f"/reports/{report_id}").json()
 
     assert body["company_name"] == "Shell"
-    assert body["pages"] == 1
+    assert body["page_count"] == 1
     assert body["fte"] == {
         "amount": 12345,
         "evidence": {

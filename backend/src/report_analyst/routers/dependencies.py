@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Annotated
 
 from report_analyst.chat import ChatService, ConversationRepository
-from report_analyst.embedder import Embedder
 from report_analyst.facts import FactExtractor
 from report_analyst.llm import AnthropicLLM
 from report_analyst.pdf import MistralExtractor, PdfExtractor
 from report_analyst.reports import ReportRepository, ReportService, Retriever
+from report_analyst.search import Embedder
 from report_analyst.settings import AppSettings
 
 
@@ -117,7 +117,7 @@ def get_retriever(
 
 def get_report_service(
     repository: Annotated[ReportRepository, Depends(get_report_repository)],
-    pdf: Annotated[PdfExtractor, Depends(get_pdf_extractor)],
+    pdf_extractor: Annotated[PdfExtractor, Depends(get_pdf_extractor)],
     retriever: Annotated[Retriever, Depends(get_retriever)],
     llm: Annotated[AnthropicLLM, Depends(get_llm)],
 ) -> ReportService:
@@ -125,14 +125,14 @@ def get_report_service(
 
     Args:
         repository: Where reports are stored.
-        pdf: Extracts a PDF's text.
+        pdf_extractor: Extracts a PDF's text.
         retriever: Embeds and searches Passages.
         llm: Extracts the Facts.
 
     Returns:
         The service.
     """
-    return ReportService(repository, pdf, retriever, FactExtractor(llm))
+    return ReportService(repository, pdf_extractor, retriever, FactExtractor(llm))
 
 
 def get_conversation_repository(
@@ -151,19 +151,17 @@ def get_conversation_repository(
 
 def get_chat_service(
     reports: Annotated[ReportRepository, Depends(get_report_repository)],
-    retriever: Annotated[Retriever, Depends(get_retriever)],
     conversations: Annotated[ConversationRepository, Depends(get_conversation_repository)],
     llm: Annotated[AnthropicLLM, Depends(get_llm)],
 ) -> ChatService:
     """Build the chat service for one request.
 
     Args:
-        reports: The stored reports.
-        retriever: Searches a report's Passages.
+        reports: The stored reports and their Facts.
         conversations: Where Conversations are stored.
-        llm: Writes the Answers.
+        llm: Matches Questions to reports and writes the Answers.
 
     Returns:
         The service.
     """
-    return ChatService(reports, retriever, conversations, llm)
+    return ChatService(reports, conversations, llm)

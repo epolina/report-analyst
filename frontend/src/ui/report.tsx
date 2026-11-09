@@ -66,7 +66,7 @@ export function PageViewer({
   src,
   boxes,
   hint,
-  onPage,
+  onPageChange,
 }: {
   title: string;
   page: number;
@@ -74,7 +74,7 @@ export function PageViewer({
   src: string;
   boxes: Box[];
   hint?: ReactNode;
-  onPage: (page: number) => void;
+  onPageChange: (page: number) => void;
 }) {
   return (
     <div className="ui-viewer">
@@ -84,24 +84,34 @@ export function PageViewer({
           {title}
         </span>
         <span className="ui-viewer-nav">
-          <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+          <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
             {ICONS.back}
           </button>
           <span>
             Page <b>{page}</b> of {pageCount}
           </span>
-          <button type="button" aria-label="Next page" disabled={page >= pageCount} onClick={() => onPage(page + 1)}>
+          <button
+            type="button"
+            aria-label="Next page"
+            disabled={page >= pageCount}
+            onClick={() => onPageChange(page + 1)}
+          >
             {ICONS.chevron}
           </button>
         </span>
       </div>
       <div className="ui-viewer-page">
         <img src={src} alt={`${title}, page ${page}`} />
-        {boxes.map((b, i) => (
+        {boxes.map((box, i) => (
           <mark
             key={i}
             // Geometry comes from the data, so it's the one inline style.
-            style={{ left: percent(b.x), top: percent(b.y), width: percent(b.width), height: percent(b.height) }}
+            style={{
+              left: percent(box.x),
+              top: percent(box.y),
+              width: percent(box.width),
+              height: percent(box.height),
+            }}
           />
         ))}
       </div>

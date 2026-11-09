@@ -19,9 +19,9 @@ from report_analyst.routers.errors import (
     ApiError,
     ErrorCode,
     ErrorOut,
-    ExistingOut,
+    ExistingReportOut,
     TooLargeOut,
-    error,
+    api_error,
 )
 from report_analyst.settings import AppSettings
 
@@ -35,7 +35,7 @@ BYTES_PER_MB = 1024 * 1024
     "",
     status_code=HTTPStatus.ACCEPTED,
     responses={
-        HTTPStatus.CONFLICT: {"model": ExistingOut},
+        HTTPStatus.CONFLICT: {"model": ExistingReportOut},
         HTTPStatus.REQUEST_ENTITY_TOO_LARGE: {"model": TooLargeOut},
         HTTPStatus.UNSUPPORTED_MEDIA_TYPE: {"model": ErrorOut},
     },
@@ -44,7 +44,7 @@ def upload(
     settings: Annotated[AppSettings, Depends(get_settings)],
     service: Annotated[ReportService, Depends(get_report_service)],
     file: Annotated[UploadFile, File()],
-    company: Annotated[str, Form(), StringConstraints(strip_whitespace=True, min_length=1)],
+    company_name: Annotated[str, Form(), StringConstraints(strip_whitespace=True, min_length=1)],
     reporting_year: Annotated[int, Form(ge=1900, le=2100)],
     on_duplicate: Annotated[OnDuplicate | None, Form()] = None,
 ) -> Report:
@@ -57,7 +57,7 @@ def upload(
         settings: The app settings.
         service: Stores the report, then extracts its FTE and goals.
         file: The annual report PDF.
-        company: The Company the report belongs to, as entered by the user.
+        company_name: The Company the report belongs to, as entered by the user.
         reporting_year: The Reporting Year the report covers.
         on_duplicate: What to do when a report for this Company and year is stored; None asks
             first with a 409 `same_company_year`.
@@ -79,18 +79,18 @@ def upload(
             TooLargeOut(code=ErrorCode.FILE_TOO_LARGE, max_upload_mb=settings.max_upload_mb),
         )
     try:
-        return service.add(company, reporting_year, content, file.filename, on_duplicate)
+        return service.add(company_name, reporting_year, content, file.filename, on_duplicate)
     except NotAPdfError as exc:
-        raise error(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, ErrorCode.NOT_A_PDF) from exc
+        raise api_error(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, ErrorCode.NOT_A_PDF) from exc
     except UnreadablePdfError as exc:
-        raise error(HTTPStatus.UNPROCESSABLE_CONTENT, ErrorCode.UNREADABLE_PDF) from exc
+        raise api_error(HTTPStatus.UNPROCESSABLE_CONTENT, ErrorCode.UNREADABLE_PDF) from exc
     except StillProcessingError as exc:
-        raise _conflict(ErrorCode.STILL_PROCESSING, exc.existing) from exc
+        raise _conflict_error(ErrorCode.STILL_PROCESSING, exc.existing) from exc
     except SameFileError as exc:
-        raise _conflict(ErrorCode.SAME_FILE, exc.existing) from exc
+        raise _conflict_error(ErrorCode.SAME_FILE, exc.existing) from exc
     except SameCompanyYearError as exc:
-        raise _conflict(ErrorCode.SAME_COMPANY_YEAR, exc.existing) from exc
+        raise _conflict_error(ErrorCode.SAME_COMPANY_YEAR, exc.existing) from exc
 
 
-def _conflict(code: ErrorCode, existing: Report) -> ApiError:
-    return ApiError(HTTPStatus.CONFLICT, ExistingOut(code=code, existing=existing))
+def _conflict_error(code: ErrorCode, existing: Report) -> ApiError:
+    return ApiError(HTTPStatus.CONFLICT, ExistingReportOut(code=code, existing=existing))
