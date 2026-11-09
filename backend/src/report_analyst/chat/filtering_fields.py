@@ -5,10 +5,11 @@ stored reports, so it writes their Companies as stored ("ABN" becomes "ABN AMRO"
 the pairs to reports is then an exact comparison in code.
 """
 
+from enum import StrEnum
 from pydantic import BaseModel, Field
 
 from report_analyst.chat.models import Turn
-from report_analyst.domain import FactKind, Report
+from report_analyst.domain import Fte, Report, SustainabilityGoal
 
 
 _EARLIER_QUESTIONS_IN_PROMPT = 3  # so a follow-up ("and in 2025?") keeps its Company
@@ -21,15 +22,30 @@ These annual reports are stored, one per line as Company, Reporting Year:
 {earlier_questions}Question: {question}
 
 Read from the question:
-1. fact: "fte" if it asks about the number of employees or full-time equivalents,
-   "sustainability_goals" if it asks about sustainability targets or goals (emissions, energy,
-   water, diversity, safety...), or null if it asks about anything else (revenue, strategy,
-   spending...).
+1. fact: which of these the question asks about, or null if it asks about anything else
+   (revenue, strategy, spending...):
+{fact_kinds}
 2. company_year_pairs: each Company and Reporting Year it asks about. Write the Company as it
    is stored above when the question clearly means it, by a short form or another spelling
    ("ABN" is "ABN AMRO"); otherwise as the question writes it. A Company named without a year
    means its latest stored year. A follow-up such as "and in 2025?" keeps the Company of the
    earlier questions. If no Company is named here or earlier, leave the list empty."""
+
+
+class FactKind(StrEnum):
+    """The kinds of Facts extracted from every report, and so the only ones the chat answers."""
+
+    FTE = "fte"
+    SUSTAINABILITY_GOALS = "sustainability_goals"
+
+    @property
+    def fact_class(self) -> type[Fte] | type[SustainabilityGoal]:
+        """The class of the Facts of this kind, whose `description` Claude reads.
+
+        Returns:
+            `Fte` or `SustainabilityGoal`.
+        """
+        return Fte if self is FactKind.FTE else SustainabilityGoal
 
 
 class CompanyYearPair(BaseModel):
@@ -65,6 +81,7 @@ def build_filtering_fields_prompt(
     """
     return _FILTERING_FIELDS_PROMPT.format(
         stored_reports="\n".join(f"{r.company_name}, {r.reporting_year}" for r in stored_reports),
+        fact_kinds="\n".join(f'   - "{kind}": {kind.fact_class.description}' for kind in FactKind),
         earlier_questions="".join(
             f"Earlier question: {turn.question}\n"
             for turn in history[-_EARLIER_QUESTIONS_IN_PROMPT:]

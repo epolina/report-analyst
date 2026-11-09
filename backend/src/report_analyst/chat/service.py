@@ -14,6 +14,7 @@ from uuid import UUID
 
 from report_analyst.chat.filtering_fields import (
     CompanyYearPair,
+    FactKind,
     FilteringFields,
     build_filtering_fields_prompt,
 )
@@ -27,7 +28,7 @@ from report_analyst.chat.models import (
     Turn,
 )
 from report_analyst.chat.repository import ConversationRepository
-from report_analyst.domain import FactKind, Facts, Fte, Report, ReportStatus, SustainabilityGoal
+from report_analyst.domain import Facts, Fte, Report, ReportStatus, SustainabilityGoal
 from report_analyst.llm import AnthropicLLM
 from report_analyst.reports import ReportRepository
 
@@ -300,7 +301,7 @@ def _build_answer_prompt(
     # the app decided; Claude still needs to know there was one.
     reports = relevant_facts.reports
     return _ANSWER_PROMPT.format(
-        fact_description=fact.description,
+        fact_description=fact.fact_class.description,
         reports="\n".join(f"- {_report_summary(r, fact, relevant_facts)}" for r in reports),
         earlier_turns="".join(
             f"Earlier question: {turn.question}\n"

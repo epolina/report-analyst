@@ -1,10 +1,10 @@
 """The domain objects: Report, Passage, Evidence and Facts. See UBIQUITOUS_LANGUAGE.md."""
 
-import inspect
 import re
 
 from enum import StrEnum
 from pydantic import BaseModel, computed_field
+from typing import ClassVar
 from uuid import UUID
 
 from report_analyst.pdf import Block, PageBox
@@ -148,6 +148,13 @@ class Fte(BaseModel):
         evidence: Where the report states it.
     """
 
+    # What this kind of Fact is and how a question asks about it, as Claude reads it in the
+    # chat's prompts. A class attribute: not stored, not sent by the API.
+    description: ClassVar[str] = (
+        "The Company's total number of full-time equivalents (FTE) for the Reporting Year, not"
+        " headcount. A question about the number of employees, staff or FTE asks about it."
+    )
+
     amount: float  # reports may give a fraction, e.g. 82,302.5
     evidence: Evidence
 
@@ -172,6 +179,14 @@ class SustainabilityGoal(BaseModel):
         evidence: Where the report states it.
     """
 
+    # What this kind of Fact is and how a question asks about it, as Claude reads it in the
+    # chat's prompts. A class attribute: not stored, not sent by the API.
+    description: ClassVar[str] = (
+        "A sustainability target the Company has set, e.g. on emissions, energy, water,"
+        " packaging, sourcing, diversity or safety. A question about sustainability goals,"
+        " targets or commitments asks about them."
+    )
+
     title: str
     deadline: int | None = None
     baseline: int | None = None
@@ -189,23 +204,6 @@ class SustainabilityGoal(BaseModel):
         if self.baseline:
             parts.append(f"baseline {self.baseline}")
         return ", ".join(parts)
-
-
-class FactKind(StrEnum):
-    """The kinds of Facts extracted from every report: the FTE and the Sustainability Goals."""
-
-    FTE = "fte"
-    SUSTAINABILITY_GOALS = "sustainability_goals"
-
-    @property
-    def description(self) -> str:
-        """What a Fact of this kind is: the first line of its class's docstring.
-
-        Returns:
-            E.g. "The Company's total FTE (not headcount) for the Reporting Year."
-        """
-        fact_class = Fte if self is FactKind.FTE else SustainabilityGoal
-        return (inspect.getdoc(fact_class) or "").splitlines()[0]
 
 
 class Facts(BaseModel):

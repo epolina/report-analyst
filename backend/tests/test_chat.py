@@ -6,6 +6,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from report_analyst.chat.filtering_fields import FilteringFields
+from report_analyst.domain import Fte, SustainabilityGoal
 from report_analyst.llm import CitedAnswer, CitedSpan, LLMError
 from report_analyst.settings import AppSettings
 from conftest import WHOLE_PAGE, FakeLLM, HeldJobs, upload
@@ -74,7 +75,9 @@ def test_an_fte_question_is_answered_from_the_extracted_facts(
     assert "Shell, 2024" in filtering_fields_prompt  # the stored reports
     assert "Question: How many FTE did shell have?" in filtering_fields_prompt
     assert "- Shell 2024: FTE found" in answer_prompt
-    assert "The Company's total FTE (not headcount)" in answer_prompt  # Fte's docstring
+    assert Fte.description in filtering_fields_prompt  # what the Fact is and how it's asked
+    assert Fte.description in answer_prompt
+    assert SustainabilityGoal.description in filtering_fields_prompt
     assert "at most three sentences" in answer_prompt
     assert fake_llm.documents == [("Shell 2024, page 1: FTE 12,345", FTE_SENTENCE)]
     assert reply["reports"] == [
@@ -269,7 +272,7 @@ def test_a_conversation_stored_before_report_matching_still_loads(
 
 
 def test_facts_say_what_they_state() -> None:
-    from report_analyst.domain import Evidence, Fte, SustainabilityGoal
+    from report_analyst.domain import Evidence
 
     evidence = Evidence(page=1, quote="q", boxes=[])
 
