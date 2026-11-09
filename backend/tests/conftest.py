@@ -62,12 +62,13 @@ class FakePdfExtractor(PdfExtractor):
 
 
 class FakeLLM:
-    """Records prompts. `complete` validates `answer` (a dict) against the schema, with the
-    context the real call would get, or gives an empty instance; `cite` returns `cited`. No
-    API calls."""
+    """Records prompts. `complete` validates the schema's entry in `answers`, else `answer`
+    (a dict), against the schema, with the context the real call would get, or gives an empty
+    instance; `cite` returns `cited`. No API calls."""
 
     def __init__(self) -> None:
         self.answer: dict[str, Any] | None = None
+        self.answers: dict[type[BaseModel], dict[str, Any]] = {}  # by schema, over `answer`
         self.cited = CitedAnswer(text="", citations=[])  # what `cite` returns
         self.prompts: list[str] = []
         self.documents: list[tuple[str, str | list[str]]] = []  # what the last `cite` was given
@@ -79,10 +80,11 @@ class FakeLLM:
 
     def complete(self, prompt: str, schema: type[BaseModel], context: Any = None) -> BaseModel:
         self.prompts.append(prompt)
-        if self.answer is None:
+        answer = self.answers.get(schema, self.answer)
+        if answer is None:
             return schema()
         try:
-            return schema.model_validate(self.answer, context=context)
+            return schema.model_validate(answer, context=context)
         except ValidationError as error:  # the real one retries, then gives up like this
             raise LLMError(str(error)) from error
 

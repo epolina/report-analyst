@@ -1,4 +1,4 @@
-// The chat: its Turns, the Question being answered, and the scope selects under the composer.
+// The chat: its Turns, the Question being answered, and the composer.
 // `useChat` holds the state; the layout places the thread and the composer in different slots.
 import { useEffect, useState } from "react";
 import {
@@ -7,22 +7,10 @@ import {
   NOT_FOUND_MESSAGES,
   type ChatEvidence,
   type Report,
-  type Scope,
+  type ReportRef,
   type Turn,
 } from "../api";
-import { ALL_COMPANIES, ANY_YEAR, companiesOf, yearsOf } from "../reports/options";
-import {
-  Answer,
-  ChatStart,
-  Composer,
-  EvidenceCard,
-  Note,
-  NotFoundCard,
-  Question,
-  Select,
-  Thinking,
-  Thread,
-} from "../ui";
+import { Answer, ChatStart, Composer, EvidenceCard, Note, NotFoundCard, Question, Thinking, Thread } from "../ui";
 
 // The open Conversation's id, so a reload shows it again.
 const CONVERSATION_KEY = "conversation";
@@ -44,7 +32,9 @@ const savedConversationId = {
   },
 };
 
-const scopeLabel = (s: Scope) => `${s.company_name ?? ALL_COMPANIES} · ${s.reporting_year ?? ANY_YEAR}`;
+// The reports a Question was matched to, shown under it: "ABN AMRO 2025 · Shell 2025".
+const reportsLabel = (reports: ReportRef[]) =>
+  reports.map((r) => `${r.company_name} ${r.reporting_year}`).join(" · ") || undefined;
 const sourceLabel = (e: ChatEvidence) => `${e.company_name} annual report ${e.reporting_year} · p. ${e.page}`;
 
 export function useChat() {
@@ -53,8 +43,6 @@ export function useChat() {
   const [draft, setDraft] = useState("");
   const [pendingQuestion, setPendingQuestion] = useState<string>();
   const [error, setError] = useState("");
-  const [scopeCompany, setScopeCompany] = useState("");
-  const [scopeYear, setScopeYear] = useState("");
 
   // Show the last Conversation again after a reload. One that's gone starts a fresh chat.
   useEffect(() => {
@@ -69,18 +57,14 @@ export function useChat() {
   }, []);
 
   function ask(question: string) {
-    const scope = { company_name: scopeCompany || null, reporting_year: scopeYear ? Number(scopeYear) : null };
     setPendingQuestion(question);
     setError("");
     setDraft("");
-    askQuestion(question, scope, conversationId)
+    askQuestion(question, conversationId)
       .then((reply) => {
         setConversationId(reply.conversation_id);
         savedConversationId.set(reply.conversation_id);
         setTurns((previousTurns) => [...previousTurns, reply]);
-        // The scope it searched, which the Question may have changed, carries over to the next.
-        setScopeCompany(reply.scope.company_name ?? "");
-        setScopeYear(reply.scope.reporting_year ? String(reply.scope.reporting_year) : "");
       })
       .catch((e: Error) => {
         setError(e.message);
@@ -96,10 +80,10 @@ export function useChat() {
     setError("");
   }
 
-  // Ask about one report next, e.g. from its page in the drawer.
-  function scopeToReport(report: { company_name: string; reporting_year: number }) {
-    setScopeCompany(report.company_name);
-    setScopeYear(String(report.reporting_year));
+  // Start a Question about one report, e.g. from its page in the drawer: the Company and year
+  // go first in the composer, and the user types the rest.
+  function askAboutReport(report: { company_name: string; reporting_year: number }) {
+    setDraft(`${report.company_name} ${report.reporting_year}: `);
   }
 
   const busy = pendingQuestion !== undefined;
@@ -110,44 +94,22 @@ export function useChat() {
     error,
     draft,
     setDraft,
-    scopeCompany,
-    setScopeCompany,
-    scopeYear,
-    setScopeYear,
     ask,
     newChat,
-    scopeToReport,
+    askAboutReport,
   };
 }
 
 type Chat = ReturnType<typeof useChat>;
 
-export function ChatComposer({ chat, reports }: { chat: Chat; reports: Report[] }) {
+export function ChatComposer({ chat }: { chat: Chat }) {
   return (
     <Composer
-      placeholder="Ask about a report, e.g. How many FTE did Shell report?"
+      placeholder="Ask about the FTE or sustainability goals, e.g. How many FTE did Shell have in 2024?"
       value={chat.draft}
       busy={chat.busy}
       onChange={chat.setDraft}
       onSubmit={() => chat.ask(chat.draft.trim())}
-      scope={
-        <>
-          <Select
-            aria-label="Company"
-            allLabel={ALL_COMPANIES}
-            options={companiesOf(reports)}
-            value={chat.scopeCompany}
-            onChange={(e) => chat.setScopeCompany(e.target.value)}
-          />
-          <Select
-            aria-label="Reporting year"
-            allLabel={ANY_YEAR}
-            options={yearsOf(reports)}
-            value={chat.scopeYear}
-            onChange={(e) => chat.setScopeYear(e.target.value)}
-          />
-        </>
-      }
     />
   );
 }
@@ -167,7 +129,7 @@ export function ChatThread({
       {reports.length > 0 && !turns.length && !busy && (
         <ChatStart
           title="What do you want to know?"
-          hint="Answers quote the report word for word and name the page."
+          hint="Ask about the FTE or the sustainability goals of one report, or compare several. Answers quote the report word for word and name the page."
           suggestions={suggestionsFor(reports)}
           onPick={chat.ask}
         />
@@ -190,23 +152,30 @@ export function ChatThread({
   );
 }
 
-// Suggested first Questions, about a report that is there to answer them.
+// Suggested first Questions, about reports that are there to answer them, and a comparison
+// when two Companies are ready.
 function suggestionsFor(reports: Report[]) {
-  const report = reports.find((candidate) => candidate.status === "success") ?? reports[0];
+  const ready = reports.filter((candidate) => candidate.status === "success");
+  const report = ready[0] ?? reports[0];
+  const other = ready.find((candidate) => candidate.company_name !== report.company_name);
   return [
-    `How much did ${report.company_name} spend on climate change adaptation in ${report.reporting_year}?`,
     `How many FTE did ${report.company_name} have in ${report.reporting_year}?`,
-    `What are ${report.company_name}'s sustainability goals?`,
+    `What are ${report.company_name}'s sustainability goals for ${report.reporting_year}?`,
+    ...(other
+      ? [
+          `Compare the sustainability goals of ${report.company_name} ${report.reporting_year} and ${other.company_name} ${other.reporting_year}`,
+        ]
+      : []),
   ];
 }
 
 // One Question and its Answer, with Evidence that opens its page, or why it wasn't found.
 function TurnView({ turn, onOpenEvidence }: { turn: Turn; onOpenEvidence: (evidence: ChatEvidence) => void }) {
   const { answer } = turn;
-  const notFound = NOT_FOUND_MESSAGES[answer.reason ?? "not_in_report"];
+  const notFound = NOT_FOUND_MESSAGES[answer.reason ?? "not_in_report"](answer.missing ?? []);
   return (
     <>
-      <Question meta={scopeLabel(turn.scope)}>{turn.question}</Question>
+      <Question meta={reportsLabel(turn.reports ?? [])}>{turn.question}</Question>
       <Answer text={answer.text}>
         {answer.kind === "answer" ? (
           answer.evidence.map((e, i) => (

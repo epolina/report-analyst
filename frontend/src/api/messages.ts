@@ -33,8 +33,22 @@ export const FAILURE_MESSAGES: Record<Schemas["ReportFailure"], string> = {
 
 export const failureMessage = (r: Report) => (r.failure ? FAILURE_MESSAGES[r.failure] : "Processing failed.");
 
-export const NOT_FOUND_MESSAGES: Record<Schemas["NotFoundReason"], { title: string; note?: string }> = {
-  not_in_report: { title: "No matching passage" },
-  report_not_ready: { title: "Report not searched", note: "Ask again once the report is Ready." },
-  no_report: { title: "No report searched", note: "Add that report, or change the Company or year below." },
+// `missing` is what the Question named that no stored report has, for no_matching_report.
+export const NOT_FOUND_MESSAGES: Record<
+  Schemas["NotFoundReason"],
+  (missing: string[]) => { title: string; note?: string }
+> = {
+  not_in_report: () => ({ title: "Not in the extracted facts" }),
+  report_not_ready: () => ({ title: "Report not ready", note: "Ask again once the report is Ready." }),
+  no_report: () => ({ title: "No report yet", note: "Add a report PDF first." }),
+  no_matching_report: (missing) => ({
+    title: "No matching report",
+    note: missing.length
+      ? `There's no report for ${missing.join(", ")}. Add it, or ask about a stored one.`
+      : "Name a stored Company, and its year if it has several reports.",
+  }),
+  unsupported_topic: () => ({
+    title: "Not supported",
+    note: "Sorry, we only support questions about the FTE and sustainability goals.",
+  }),
 };

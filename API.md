@@ -63,25 +63,33 @@
 
 // POST /chat
 { "conversation_id": null,                           // null starts a new one
-  "question": "How much did Shell spend on climate change adaptation in 2025?",
-  "scope": { "company_name": null, "reporting_year": null } }   // the selects; null = any
-// A Company or year named in the question (only stored ones) wins over the selects.
+  "question": "Compare the sustainability goals of ABN 2025 and Shell 2025" }
+// Claude matches the question (and earlier ones, for a follow-up) to the stored reports, then
+// answers from their extracted Facts. Only the FTE and Sustainability Goals are supported.
 // → 200 ChatReply
 { "conversation_id": "<uuid>",
   "question": "...",
-  "scope": { "company_name": "Shell", "reporting_year": 2025 },  // what was searched; shown in the UI
+  "reports": [ReportRef],   // the reports it was matched to; shown under the question
   "answer": Answer }
 
-// Answer
-{ "kind": "answer", "text": "...", "evidence": [ChatEvidence], "reason": null }   // ≥ 1 evidence
-{ "kind": "not_found", "text": "..." | "", "evidence": [],   // "" unless Claude wrote it
-  "reason": "not_in_report" | "report_not_ready" | "no_report" }
+// ReportRef
+{ "report_id": "<uuid>", "company_name": "ABN AMRO", "reporting_year": 2025 }
 
-// ChatEvidence: Evidence plus its report, since one Question can search several
+// Answer
+{ "kind": "answer", "text": "...", "evidence": [ChatEvidence], "reason": null, "missing": [] }
+{ "kind": "not_found", "text": "..." | "", "evidence": [],   // "" unless Claude wrote it
+  "reason": "not_in_report"         // the Facts don't state it, or the answer cited none
+          | "report_not_ready"      // the reports asked about are processing or failed
+          | "no_report"             // nothing is stored yet
+          | "no_matching_report"    // a Company or year with no stored report: see missing
+          | "unsupported_topic",    // not about the FTE or Sustainability Goals
+  "missing": ["ABN AMRO 2023"] }    // for no_matching_report; [] otherwise
+
+// ChatEvidence: a cited Fact's Evidence plus its report, since one Question can cover several
 { "report_id": "<uuid>", "company_name": "Shell", "reporting_year": 2025, "page": 57,
   "quote": "<verbatim>", "boxes": [PageBox] }
 
-// GET /conversations/{id} → 200 { "conversation_id": "<uuid>", "turns": [{question, scope, answer}] }
+// GET /conversations/{id} → 200 { "conversation_id": "<uuid>", "turns": [{question, reports, answer}] }
 ```
 
 ## Rules

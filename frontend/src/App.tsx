@@ -79,7 +79,7 @@ export default function App() {
           onAdd={() => setUploadOpen(true)}
           onRetried={refreshReports}
           onAsk={(report) => {
-            chat.scopeToReport(report);
+            chat.askAboutReport(report);
             setDrawerOpen(false);
           }}
         />
@@ -106,7 +106,7 @@ export default function App() {
           </TopBarButton>
         </>
       }
-      dock={allReports.length > 0 && <ChatComposer chat={chat} reports={allReports} />}
+      dock={allReports.length > 0 && <ChatComposer chat={chat} />}
     >
       {reports && !allReports.length && (
         <EmptyState

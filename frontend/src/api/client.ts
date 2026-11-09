@@ -11,7 +11,7 @@ export type Evidence = Schemas["Evidence"];
 export type Duplicate = Schemas["ExistingReportOut"];
 export type ErrorCode = Schemas["ErrorCode"];
 export type OnDuplicate = Schemas["OnDuplicate"];
-export type Scope = Schemas["Scope"];
+export type ReportRef = Schemas["ReportRef"];
 export type Turn = Schemas["Turn"];
 export type ChatEvidence = Schemas["ChatEvidence"];
 export type ChatReply = Schemas["ChatReply"];
@@ -76,11 +76,11 @@ export function pageImageUrl(reportId: string, page: number) {
 }
 
 // Ask a Question; a null conversation starts a new one. Takes about 5-15 s.
-export function askQuestion(question: string, scope: Scope, conversationId: string | null) {
+export function askQuestion(question: string, conversationId: string | null) {
   return request<ChatReply>("/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, scope, conversation_id: conversationId }),
+    body: JSON.stringify({ question, conversation_id: conversationId }),
   });
 }
 

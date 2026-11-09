@@ -71,3 +71,20 @@ def test_complete_validates_with_the_context() -> None:
     )
     with pytest.raises(LLMError, match="No valid CheckedAnswer"):  # retried, then given up
         llm.complete("Which company?", CheckedAnswer, {"companies": {"ASML"}})
+
+
+def test_a_table_is_cited_by_whole_rows() -> None:
+    from anthropic.types.beta import BetaCitationContentBlockLocation
+
+    from report_analyst.llm import _cited_text
+
+    rows = ["Key figures", "| | 2025 |", "| --- | --- |", "| FTE | 23,126 |", "| NIM | 152 |"]
+    citation = BetaCitationContentBlockLocation(
+        type="content_block_location",
+        cited_text="ignored",
+        document_index=0,
+        start_block_index=3,
+        end_block_index=4,
+    )
+
+    assert _cited_text(citation, [("t", rows)]) == "| FTE | 23,126 |"

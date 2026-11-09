@@ -176,9 +176,10 @@ export interface paths {
         put?: never;
         /**
          * Ask
-         * @description Answer a Question from the reports in scope, with verbatim Evidence, or say Not Found.
+         * @description Answer a Question about the FTE or Sustainability Goals, with verbatim Evidence.
          *
-         *     Not Found is a normal answer (`kind: "not_found"`), not an error. Takes about 5-15 s.
+         *     Not Found is a normal answer (`kind: "not_found"`), not an error: also for a Company
+         *     or year with no stored report, or a Question about anything else. Takes about 5-15 s.
          *
          *     Args:
          *         request: The Question.
@@ -264,6 +265,8 @@ export interface components {
          *             asking Claude, which the UI words from `reason`.
          *         evidence: At least one for an answer; none for Not Found.
          *         reason: Why it wasn't found; None for an answer.
+         *         missing: For `no_matching_report`, what the Question names that isn't stored, e.g.
+         *             "ABN AMRO 2023"; empty otherwise.
          */
         Answer: {
             /**
@@ -279,6 +282,11 @@ export interface components {
              */
             evidence: components["schemas"]["ChatEvidence"][];
             reason?: components["schemas"]["NotFoundReason"] | null;
+            /**
+             * Missing
+             * @default []
+             */
+            missing: string[];
         };
         /** Body_upload_uploads_post */
         Body_upload_uploads_post: {
@@ -326,7 +334,11 @@ export interface components {
         ChatReply: {
             /** Question */
             question: string;
-            scope: components["schemas"]["Scope"];
+            /**
+             * Reports
+             * @default []
+             */
+            reports: components["schemas"]["ReportRef"][];
             answer: components["schemas"]["Answer"];
             /**
              * Conversation Id
@@ -340,16 +352,14 @@ export interface components {
          *
          *     Attributes:
          *         conversation_id: The Conversation to continue; None starts one.
-         *         question: The Question.
-         *         scope: The Company and year chosen in the UI. Ones named in the Question win.
+         *         question: The Question. Its Company and year are read from it, or from the
+         *             earlier Questions for a follow-up.
          */
         ChatRequest: {
             /** Conversation Id */
             conversation_id?: string | null;
             /** Question */
             question: string;
-            /** @default {} */
-            scope: components["schemas"]["Scope"];
         };
         /**
          * Conversation
@@ -447,7 +457,7 @@ export interface components {
          * @description Why a Question has no Answer.
          * @enum {string}
          */
-        NotFoundReason: "not_in_report" | "report_not_ready" | "no_report";
+        NotFoundReason: "not_in_report" | "report_not_ready" | "no_report" | "no_matching_report" | "unsupported_topic";
         /**
          * OnDuplicate
          * @description What the user chose for an upload with the Company and year of a stored report.
@@ -539,25 +549,31 @@ export interface components {
          */
         ReportFailure: "unreadable_pdf" | "facts_failed" | "interrupted" | "unexpected";
         /**
+         * ReportRef
+         * @description A stored report, named the way the UI shows it.
+         *
+         *     Attributes:
+         *         report_id: The report's id.
+         *         company_name: Its Company.
+         *         reporting_year: Its Reporting Year.
+         */
+        ReportRef: {
+            /**
+             * Report Id
+             * Format: uuid
+             */
+            report_id: string;
+            /** Company Name */
+            company_name: string;
+            /** Reporting Year */
+            reporting_year: number;
+        };
+        /**
          * ReportStatus
          * @description Where a Report is in processing. Processing runs in the background after the upload.
          * @enum {string}
          */
         ReportStatus: "processing" | "success" | "failed";
-        /**
-         * Scope
-         * @description Which reports a Question searches. None means any.
-         *
-         *     Attributes:
-         *         company_name: The Company.
-         *         reporting_year: The Reporting Year.
-         */
-        Scope: {
-            /** Company Name */
-            company_name?: string | null;
-            /** Reporting Year */
-            reporting_year?: number | null;
-        };
         /**
          * SustainabilityGoal
          * @description A sustainability target the Company has set.
@@ -596,13 +612,18 @@ export interface components {
          *
          *     Attributes:
          *         question: As the user typed it.
-         *         scope: The scope it searched, after reading the Company and year from the Question.
+         *         reports: The reports the Question was matched to and answered from; empty if none
+         *             matched.
          *         answer: The Answer.
          */
         Turn: {
             /** Question */
             question: string;
-            scope: components["schemas"]["Scope"];
+            /**
+             * Reports
+             * @default []
+             */
+            reports: components["schemas"]["ReportRef"][];
             answer: components["schemas"]["Answer"];
         };
         /** ValidationError */

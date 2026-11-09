@@ -1,10 +1,10 @@
 # Report analyst
 
-Ask questions about companies' annual reports and get answers you can check. Every answer quotes the report word for word and shows the page, with the quoted passage highlighted. If the report doesn't say, the answer is "Not Found" instead of a guess.
+Ask about the FTE and sustainability goals in companies' annual reports and get answers you can check. Every answer quotes the report word for word and shows the page, with the quoted passage highlighted. If the report doesn't say, the answer is "Not Found" instead of a guess.
 
 - **Add a report.** Upload a PDF and type its Company and Reporting Year. Processing then runs in the background: it reads the text, renders the pages, builds a search index and extracts two facts, the total **FTE** and the **sustainability goals**, each with its evidence.
 - **Browse a report.** Open it from the Reports drawer to see its facts next to the PDF page each one comes from.
-- **Chat.** Ask in plain English, e.g. "How many FTE did Shell have in 2024?". A Company or year named in the question sets the scope; otherwise the selects under the input do. Conversations are kept across restarts.
+- **Chat.** Ask about the FTE or the sustainability goals in plain English, e.g. "How many FTE did Shell have in 2024?" or "Compare the goals of ABN 2025 and Shell 2025". Claude first matches the question to the stored reports, short names included; a Company or year with no stored report is named back to you, and a question about anything else gets "Sorry, we only support questions about the FTE and sustainability goals". It then answers from the facts extracted while processing. Conversations are kept across restarts.
 
 Everything runs on your machine except two API calls: Mistral reads the PDF's text, and Claude writes the facts and answers. Data is stored as files under `backend/data/`.
 

@@ -151,19 +151,17 @@ def get_conversation_repository(
 
 def get_chat_service(
     reports: Annotated[ReportRepository, Depends(get_report_repository)],
-    retriever: Annotated[Retriever, Depends(get_retriever)],
     conversations: Annotated[ConversationRepository, Depends(get_conversation_repository)],
     llm: Annotated[AnthropicLLM, Depends(get_llm)],
 ) -> ChatService:
     """Build the chat service for one request.
 
     Args:
-        reports: The stored reports.
-        retriever: Searches a report's Passages.
+        reports: The stored reports and their Facts.
         conversations: Where Conversations are stored.
-        llm: Writes the Answers.
+        llm: Matches Questions to reports and writes the Answers.
 
     Returns:
         The service.
     """
-    return ChatService(reports, retriever, conversations, llm)
+    return ChatService(reports, conversations, llm)

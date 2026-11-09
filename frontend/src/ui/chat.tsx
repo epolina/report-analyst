@@ -47,7 +47,7 @@ export function ChatStart({
   );
 }
 
-// The user's Question, right-aligned, with the scope it searched under it.
+// The user's Question, right-aligned, with a muted line under it (e.g. the reports it was about).
 export function Question({ children, meta }: { children: ReactNode; meta?: ReactNode }) {
   return (
     <div className="ui-question">
@@ -120,9 +120,8 @@ export function NotFoundCard({ title, children }: { title: string; children?: Re
   );
 }
 
-// The question box docked under the chat: a scope line ("Searching …") and a pill input.
+// The question box docked under the chat: a pill input and its Ask button.
 export function Composer({
-  scope,
   placeholder,
   value,
   disabled,
@@ -130,7 +129,6 @@ export function Composer({
   onChange,
   onSubmit,
 }: {
-  scope?: ReactNode;
   placeholder: string;
   value: string;
   disabled?: boolean;
@@ -147,12 +145,6 @@ export function Composer({
         if (value.trim() && !busy) onSubmit();
       }}
     >
-      {scope && (
-        <div className="ui-scope">
-          <span>Searching</span>
-          {scope}
-        </div>
-      )}
       <div className="ui-ask">
         <label htmlFor={inputId} className="ui-visually-hidden">
           Question
