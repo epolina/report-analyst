@@ -110,7 +110,7 @@ def test_goals_of_two_reports_are_compared(
     assert "- Shell 2025: 0 sustainability goals found" in answer_prompt
     assert "a short paragraph for each report" in answer_prompt
     assert fake_llm.documents == [
-        ("ABN AMRO 2025, page 1: goal: Net zero, deadline 2050", GOAL_SENTENCE)
+        ("ABN AMRO 2025, page 1: Sustainability goal: Net zero, deadline 2050", GOAL_SENTENCE)
     ]
     assert [r["report_id"] for r in reply["reports"]] == [abn, shell]
     [evidence] = reply["answer"]["evidence"]
@@ -265,3 +265,18 @@ def test_a_conversation_stored_before_report_matching_still_loads(
     [turn] = client.get(f"/conversations/{conversation_id}").json()["turns"]
 
     assert (turn["question"], turn["reports"], turn["answer"]["missing"]) == ("FTE?", [], [])
+
+
+def test_facts_say_what_they_state() -> None:
+    from report_analyst.domain import Evidence, Fte, SustainabilityGoal
+
+    evidence = Evidence(page=1, quote="q", boxes=[])
+
+    assert Fte(amount=88497, evidence=evidence).as_string() == "FTE 88,497"
+    assert Fte(amount=82302.5, evidence=evidence).as_string() == "FTE 82,302.5"
+    assert Fte(amount=1234567, evidence=evidence).as_string() == "FTE 1,234,567"
+    goal = SustainabilityGoal(title="Net zero", deadline=2050, baseline=2019, evidence=evidence)
+    assert goal.as_string() == "Sustainability goal: Net zero, deadline 2050, baseline 2019"
+    assert SustainabilityGoal(title="Zero waste", evidence=evidence).as_string() == (
+        "Sustainability goal: Zero waste"
+    )

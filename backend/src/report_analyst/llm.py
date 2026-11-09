@@ -9,6 +9,7 @@ from anthropic.types.beta import (
     BetaCitationContentBlockLocation,
     BetaContentBlockParam,
 )
+from collections.abc import Sequence
 from instructor.core.exceptions import InstructorRetryException
 from pydantic import BaseModel
 from typing import Any
@@ -112,7 +113,7 @@ class AnthropicLLM:
                 f"No valid {schema.__name__} after {error.n_attempts} attempts"
             ) from error
 
-    def cite(self, prompt: str, documents: list[tuple[str, str | list[str]]]) -> CitedAnswer:
+    def cite(self, prompt: str, documents: Sequence[tuple[str, str | list[str]]]) -> CitedAnswer:
         """Ask Claude about documents, getting text back with what it cites from them.
 
         The API copies each cited span from its document, so quotes are verbatim by
@@ -174,7 +175,7 @@ class AnthropicLLM:
 
 def _cited_text(
     citation: BetaCitationCharLocation | BetaCitationContentBlockLocation,
-    documents: list[tuple[str, str | list[str]]],
+    documents: Sequence[tuple[str, str | list[str]]],
 ) -> str:
     # Text documents: the API's cited span. Block documents: the blocks themselves, by index,
     # one per line, so a cited table keeps its rows apart.

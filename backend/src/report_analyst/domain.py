@@ -150,6 +150,15 @@ class Fte(BaseModel):
     amount: float  # reports may give a fraction, e.g. 82,302.5
     evidence: Evidence
 
+    def as_string(self) -> str:
+        """Say what the Fact states, e.g. "FTE 88,497" or "FTE 82,302.5".
+
+        Returns:
+            The text, never in exponent notation.
+        """
+        amount = self.amount
+        return f"FTE {amount:,.0f}" if amount.is_integer() else f"FTE {amount:,}"
+
 
 class SustainabilityGoal(BaseModel):
     """A sustainability target the Company has set.
@@ -166,6 +175,19 @@ class SustainabilityGoal(BaseModel):
     deadline: int | None = None
     baseline: int | None = None
     evidence: Evidence
+
+    def as_string(self) -> str:
+        """Say what the Fact states, e.g. "Sustainability goal: Net zero, deadline 2050".
+
+        Returns:
+            The title, with the deadline and baseline when the report states them.
+        """
+        parts = [f"Sustainability goal: {self.title}"]
+        if self.deadline:
+            parts.append(f"deadline {self.deadline}")
+        if self.baseline:
+            parts.append(f"baseline {self.baseline}")
+        return ", ".join(parts)
 
 
 class Facts(BaseModel):

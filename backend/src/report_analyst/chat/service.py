@@ -28,7 +28,7 @@ from report_analyst.chat.models import (
     Turn,
 )
 from report_analyst.chat.repository import ConversationRepository
-from report_analyst.domain import Evidence, Facts, Report, ReportStatus
+from report_analyst.domain import Facts, Fte, Report, ReportStatus, SustainabilityGoal
 from report_analyst.llm import AnthropicLLM
 from report_analyst.reports import ReportRepository
 
@@ -102,11 +102,37 @@ class QuestionNotAnsweredError(Exception):
 
 @dataclass(frozen=True)
 class RelevantFact:
-    """One Fact shown to Claude: its report, what it states, and its Evidence."""
+    """One Fact the Question asks about, with the report it is from."""
 
     report: Report
-    label: str  # e.g. "FTE 88,497" or "goal: Net zero, deadline 2050"
-    evidence: Evidence
+    fact: Fte | SustainabilityGoal
+
+    def as_document(self) -> tuple[str, str]:
+        """The Fact as a document Claude can cite: (title, content).
+
+        The title names the report, page and Fact, e.g. "Shell 2024, page 93: FTE 88,497".
+        The content is the report's verbatim quote, so whatever Claude cites from it is a
+        quote from the report. Claude can't cite the title.
+
+        Returns:
+            The title and the content.
+        """
+        report, evidence = self.report, self.fact.evidence
+        title = f"{report.company_name} {report.reporting_year}, page {evidence.page}"
+        return f"{title}: {self.fact.as_string()}", evidence.quote
+
+    def as_chat_evidence(self) -> ChatEvidence:
+        """The Fact's Evidence (quote, page, boxes) with its report, to show in the chat.
+
+        Returns:
+            The Evidence.
+        """
+        return ChatEvidence(
+            **self.fact.evidence.model_dump(),
+            report_id=self.report.report_id,
+            company_name=self.report.company_name,
+            reporting_year=self.report.reporting_year,
+        )
 
 
 @dataclass(frozen=True)
@@ -202,9 +228,8 @@ class ChatService:
     def _extract_filtering_fields(
         self, question: str, history: list[Turn], stored_reports: list[Report]
     ) -> FilteringFields:
-        return self._llm.complete(
-            build_filtering_fields_prompt(question, history, stored_reports), FilteringFields
-        )
+        prompt = build_filtering_fields_prompt(question, history, stored_reports)
+        return self._llm.complete(prompt=prompt, schema=FilteringFields)
 
     def _find_relevant_facts(
         self,
@@ -229,7 +254,7 @@ class ChatService:
         facts = [
             relevant_fact
             for report in ready_reports
-            for relevant_fact in _facts_of_kind(
+            for relevant_fact in _collect_relevant_facts(
                 report, self._reports.facts(report.report_id) or Facts(), fact
             )
         ]
@@ -238,26 +263,16 @@ class ChatService:
     def _generate_answer(
         self, question: str, history: list[Turn], fact: FactKind, relevant_facts: RelevantFacts
     ) -> Answer:
-        cited_answer = self._llm.cite(
-            _build_answer_prompt(question, history, fact, relevant_facts),
-            [
-                (
-                    f"{f.report.company_name} {f.report.reporting_year}, page {f.evidence.page}: "
-                    f"{f.label}",
-                    f.evidence.quote,
-                )
-                for f in relevant_facts.facts
-            ],
+        prompt = _build_answer_prompt(question, history, fact, relevant_facts)
+        documents = [relevant_fact.as_document() for relevant_fact in relevant_facts.facts]
+        cited_answer = self._llm.cite(prompt=prompt, documents=documents)
+
+        # A citation points at a document by its position, which is the Fact's position in
+        # `relevant_facts.facts`. Each cited Fact is shown once, even if Claude cites it twice.
+        cited_positions = dict.fromkeys(
+            citation.document_index for citation in cited_answer.citations if citation.text.strip()
         )
-        # Each cited Fact becomes Evidence: its own quote, page and boxes, so the UI highlights
-        # it as in the report view. Claude may cite a Fact twice; it's one Evidence.
-        cited_documents = dict.fromkeys(
-            c.document_index for c in cited_answer.citations if c.text.strip()
-        )
-        evidence = [
-            _chat_evidence(relevant_facts.facts[document_index])
-            for document_index in cited_documents
-        ]
+        evidence = [relevant_facts.facts[i].as_chat_evidence() for i in cited_positions]
         return Answer(kind="answer", text=cited_answer.text, evidence=evidence)
 
 
@@ -268,25 +283,10 @@ def _is_report_for(report: Report, pair: CompanyYearPair) -> bool:
     )
 
 
-def _facts_of_kind(report: Report, facts: Facts, fact: FactKind) -> list[RelevantFact]:
+def _collect_relevant_facts(report: Report, facts: Facts, fact: FactKind) -> list[RelevantFact]:
     if fact is FactKind.FTE:
-        if facts.fte is None:
-            return []
-        return [RelevantFact(report, f"FTE {_format_amount(facts.fte.amount)}", facts.fte.evidence)]
-    relevant = []
-    for goal in facts.goals:
-        years = [
-            f"deadline {goal.deadline}" if goal.deadline else "",
-            f"baseline {goal.baseline}" if goal.baseline else "",
-        ]
-        label = ", ".join(["goal: " + goal.title, *filter(None, years)])
-        relevant.append(RelevantFact(report, label, goal.evidence))
-    return relevant
-
-
-def _format_amount(amount: float) -> str:
-    # 88497.0 -> "88,497"; 82302.5 -> "82,302.5". Never in exponent notation.
-    return f"{amount:,.0f}" if amount.is_integer() else f"{amount:,}"
+        return [RelevantFact(report, facts.fte)] if facts.fte else []
+    return [RelevantFact(report, goal) for goal in facts.goals]
 
 
 def _build_answer_prompt(
@@ -319,16 +319,6 @@ def _report_summary(report: Report, fact: FactKind, relevant_facts: RelevantFact
     if fact is FactKind.FTE:
         return f"{name}: {'FTE found' if found else 'no FTE found'}"
     return f"{name}: {found} sustainability goal{'' if found == 1 else 's'} found"
-
-
-def _chat_evidence(relevant_fact: RelevantFact) -> ChatEvidence:
-    report = relevant_fact.report
-    return ChatEvidence(
-        **relevant_fact.evidence.model_dump(),
-        report_id=report.report_id,
-        company_name=report.company_name,
-        reporting_year=report.reporting_year,
-    )
 
 
 def _report_refs(reports: list[Report]) -> list[ReportRef]:
