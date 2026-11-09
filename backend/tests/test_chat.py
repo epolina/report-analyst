@@ -74,7 +74,7 @@ def test_an_fte_question_is_answered_from_the_extracted_facts(
     filtering_fields_prompt, answer_prompt = fake_llm.prompts[-2:]
     assert "Shell, 2024" in filtering_fields_prompt  # the stored reports
     assert "Question: How many FTE did shell have?" in filtering_fields_prompt
-    assert "- Shell 2024: FTE found" in answer_prompt
+    assert "- Shell 2024: 1 fact found" in answer_prompt
     assert Fte.description in filtering_fields_prompt  # what the Fact is and how it's asked
     assert Fte.description in answer_prompt
     assert SustainabilityGoal.description in filtering_fields_prompt
@@ -110,8 +110,8 @@ def test_goals_of_two_reports_are_compared(
     reply = ask(client, "Compare the sustainability goals of ABN 2025 and Shell 2025")
 
     answer_prompt = fake_llm.prompts[-1]
-    assert "- ABN AMRO 2025: 1 sustainability goal found" in answer_prompt
-    assert "- Shell 2025: 0 sustainability goals found" in answer_prompt
+    assert "- ABN AMRO 2025: 1 fact found" in answer_prompt
+    assert "- Shell 2025: 0 facts found" in answer_prompt
     assert "a short paragraph for each report" in answer_prompt
     assert fake_llm.documents == [
         ("ABN AMRO 2025, page 1: Sustainability goal: Net zero, deadline 2050", GOAL_SENTENCE)

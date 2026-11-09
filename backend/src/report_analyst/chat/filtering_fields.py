@@ -9,7 +9,7 @@ from enum import StrEnum
 from pydantic import BaseModel, Field
 
 from report_analyst.chat.models import Turn
-from report_analyst.domain import Fte, Report, SustainabilityGoal
+from report_analyst.domain import Facts, Fte, Report, SustainabilityGoal
 from report_analyst.llm import AnthropicLLM
 
 
@@ -47,6 +47,19 @@ class FactKind(StrEnum):
             `Fte` or `SustainabilityGoal`.
         """
         return Fte if self is FactKind.FTE else SustainabilityGoal
+
+    def facts_in(self, facts: Facts) -> list[Fte] | list[SustainabilityGoal]:
+        """The Facts of this kind among a report's Facts: its FTE, or all its goals.
+
+        Args:
+            facts: A report's Facts.
+
+        Returns:
+            The Facts of this kind; empty if the report has none.
+        """
+        if self is FactKind.FTE:
+            return [facts.fte] if facts.fte else []
+        return facts.goals
 
 
 class CompanyYearPair(BaseModel):

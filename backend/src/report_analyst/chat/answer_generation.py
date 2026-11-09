@@ -121,7 +121,7 @@ def _build_prompt(
     # the app decided; Claude still needs to know there was one.
     return _ANSWER_PROMPT.format(
         fact_description=fact_kind.fact_class.description,
-        reports="\n".join(f"- {_report_summary(r, fact_kind, relevant_facts)}" for r in reports),
+        reports="\n".join(f"- {_report_summary(r, relevant_facts)}" for r in reports),
         earlier_turns="".join(
             f"Earlier question: {turn.question}\n"
             f"Earlier answer: {turn.answer.text or '(not found)'}\n\n"
@@ -132,13 +132,11 @@ def _build_prompt(
     )
 
 
-def _report_summary(report: Report, fact_kind: FactKind, relevant_facts: list[RelevantFact]) -> str:
+def _report_summary(report: Report, relevant_facts: list[RelevantFact]) -> str:
     name = f"{report.company_name} {report.reporting_year}"
     if report.status is ReportStatus.PROCESSING:
         return f"{name}: still being processed, so it has no facts yet"
     if report.status is ReportStatus.FAILED:
         return f"{name}: processing failed, so it has no facts"
     found = sum(1 for f in relevant_facts if f.report.report_id == report.report_id)
-    if fact_kind is FactKind.FTE:
-        return f"{name}: {'FTE found' if found else 'no FTE found'}"
-    return f"{name}: {found} sustainability goal{'' if found == 1 else 's'} found"
+    return f"{name}: {found} fact{'' if found == 1 else 's'} found"

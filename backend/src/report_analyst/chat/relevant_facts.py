@@ -74,10 +74,7 @@ def collect_relevant_facts(
     relevant_facts: list[RelevantFact] = []
     for report in reports:
         report_facts = report_repository.facts(report.report_id) or Facts()
-        if fact_kind is FactKind.FTE and report_facts.fte:
-            relevant_facts.append(RelevantFact(report, report_facts.fte))
-        if fact_kind is FactKind.SUSTAINABILITY_GOALS:
-            relevant_facts += [RelevantFact(report, goal) for goal in report_facts.goals]
+        relevant_facts += [RelevantFact(report, fact) for fact in fact_kind.facts_in(report_facts)]
     return relevant_facts
 
 
