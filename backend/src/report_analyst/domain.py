@@ -1,5 +1,6 @@
 """The domain objects: Report, Passage, Evidence and Facts. See UBIQUITOUS_LANGUAGE.md."""
 
+import inspect
 import re
 
 from enum import StrEnum
@@ -188,6 +189,23 @@ class SustainabilityGoal(BaseModel):
         if self.baseline:
             parts.append(f"baseline {self.baseline}")
         return ", ".join(parts)
+
+
+class FactKind(StrEnum):
+    """The kinds of Facts extracted from every report: the FTE and the Sustainability Goals."""
+
+    FTE = "fte"
+    SUSTAINABILITY_GOALS = "sustainability_goals"
+
+    @property
+    def description(self) -> str:
+        """What a Fact of this kind is: the first line of its class's docstring.
+
+        Returns:
+            E.g. "The Company's total FTE (not headcount) for the Reporting Year."
+        """
+        fact_class = Fte if self is FactKind.FTE else SustainabilityGoal
+        return (inspect.getdoc(fact_class) or "").splitlines()[0]
 
 
 class Facts(BaseModel):

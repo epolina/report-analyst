@@ -14,7 +14,6 @@ from uuid import UUID
 
 from report_analyst.chat.filtering_fields import (
     CompanyYearPair,
-    FactKind,
     FilteringFields,
     build_filtering_fields_prompt,
 )
@@ -28,7 +27,7 @@ from report_analyst.chat.models import (
     Turn,
 )
 from report_analyst.chat.repository import ConversationRepository
-from report_analyst.domain import Facts, Fte, Report, ReportStatus, SustainabilityGoal
+from report_analyst.domain import FactKind, Facts, Fte, Report, ReportStatus, SustainabilityGoal
 from report_analyst.llm import AnthropicLLM
 from report_analyst.reports import ReportRepository
 
@@ -36,9 +35,9 @@ from report_analyst.reports import ReportRepository
 _EARLIER_TURNS_IN_PROMPT = 3  # so a follow-up makes sense
 
 _ANSWER_PROMPT = """\
-The documents above are facts extracted from companies' annual reports: {fact}. Each title
-names the report, the page and the fact; each document is the quote from the report that
-states it.
+The documents above are facts extracted from companies' annual reports, all of one kind:
+{fact_description} Each title names the report, the page and the fact; each document is the
+quote from the report that states it.
 
 The reports asked about:
 {reports}
@@ -47,11 +46,6 @@ The reports asked about:
 
 {length} Cite the documents that state what you say. If they don't answer the question, say
 so in one sentence and cite nothing: an honest "not found" is better than a guess."""
-
-_FACT_DESCRIPTION = {
-    FactKind.FTE: "the total number of full-time equivalents (FTE)",
-    FactKind.SUSTAINABILITY_GOALS: "the Company's sustainability goals",
-}
 
 _LENGTH_FOR_ONE_REPORT = (
     "Answer in plain text, in at most three sentences, with the figure and its unit if there"
@@ -306,7 +300,7 @@ def _build_answer_prompt(
     # the app decided; Claude still needs to know there was one.
     reports = relevant_facts.reports
     return _ANSWER_PROMPT.format(
-        fact=_FACT_DESCRIPTION[fact],
+        fact_description=fact.description,
         reports="\n".join(f"- {_report_summary(r, fact, relevant_facts)}" for r in reports),
         earlier_turns="".join(
             f"Earlier question: {turn.question}\n"

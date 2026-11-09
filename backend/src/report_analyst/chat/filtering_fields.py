@@ -5,11 +5,10 @@ stored reports, so it writes their Companies as stored ("ABN" becomes "ABN AMRO"
 the pairs to reports is then an exact comparison in code.
 """
 
-from enum import StrEnum
 from pydantic import BaseModel, Field
 
 from report_analyst.chat.models import Turn
-from report_analyst.domain import Report
+from report_analyst.domain import FactKind, Report
 
 
 _EARLIER_QUESTIONS_IN_PROMPT = 3  # so a follow-up ("and in 2025?") keeps its Company
@@ -31,13 +30,6 @@ Read from the question:
    ("ABN" is "ABN AMRO"); otherwise as the question writes it. A Company named without a year
    means its latest stored year. A follow-up such as "and in 2025?" keeps the Company of the
    earlier questions. If no Company is named here or earlier, leave the list empty."""
-
-
-class FactKind(StrEnum):
-    """The Facts extracted from every report, and so the only ones the chat answers about."""
-
-    FTE = "fte"
-    SUSTAINABILITY_GOALS = "sustainability_goals"
 
 
 class CompanyYearPair(BaseModel):
