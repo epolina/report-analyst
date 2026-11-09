@@ -42,7 +42,7 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
 │       │   ├── service.py      # ReportService: add (checks, duplicates) and the background job
 │       │   ├── repository.py   # ReportRepository: one folder per report
 │       │   ├── retriever.py    # Retriever: embeds Passages, searches them with a cached index
-│       │   ├── splitting.py    # split: Blocks into Passages for search
+│       │   ├── splitting.py    # split_into_passages: Blocks into Passages for search
 │       │   └── errors.py       # what can go wrong when adding a report
 │       ├── facts/
 │       │   ├── extractor.py    # FactExtractor: topic searches, then one Claude call

@@ -117,7 +117,7 @@ def get_retriever(
 
 def get_report_service(
     repository: Annotated[ReportRepository, Depends(get_report_repository)],
-    pdf: Annotated[PdfExtractor, Depends(get_pdf_extractor)],
+    pdf_extractor: Annotated[PdfExtractor, Depends(get_pdf_extractor)],
     retriever: Annotated[Retriever, Depends(get_retriever)],
     llm: Annotated[AnthropicLLM, Depends(get_llm)],
 ) -> ReportService:
@@ -125,14 +125,14 @@ def get_report_service(
 
     Args:
         repository: Where reports are stored.
-        pdf: Extracts a PDF's text.
+        pdf_extractor: Extracts a PDF's text.
         retriever: Embeds and searches Passages.
         llm: Extracts the Facts.
 
     Returns:
         The service.
     """
-    return ReportService(repository, pdf, retriever, FactExtractor(llm))
+    return ReportService(repository, pdf_extractor, retriever, FactExtractor(llm))
 
 
 def get_conversation_repository(

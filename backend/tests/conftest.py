@@ -108,14 +108,14 @@ class ImmediateJobs:
 @pytest.fixture(autouse=True)
 def immediate_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
     """Process uploads straight away, so a test sees the report ready after the request."""
-    monkeypatch.setattr(service, "_JOBS", ImmediateJobs())
+    monkeypatch.setattr(service, "_PROCESSING_QUEUE", ImmediateJobs())
 
 
 @pytest.fixture
 def held_jobs(monkeypatch: pytest.MonkeyPatch) -> HeldJobs:
     """Keep jobs queued until the test calls `run`, to see a report while it's processing."""
     jobs = HeldJobs()
-    monkeypatch.setattr(service, "_JOBS", jobs)
+    monkeypatch.setattr(service, "_PROCESSING_QUEUE", jobs)
     return jobs
 
 

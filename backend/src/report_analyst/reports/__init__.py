@@ -10,7 +10,7 @@ from report_analyst.reports.errors import (
 )
 from report_analyst.reports.repository import ReportRepository
 from report_analyst.reports.retriever import Retriever
-from report_analyst.reports.service import ReportService, fail_interrupted
+from report_analyst.reports.service import ReportService, fail_interrupted_reports
 
 
 __all__ = [
@@ -23,5 +23,5 @@ __all__ = [
     "SameFileError",
     "StillProcessingError",
     "UnreadablePdfError",
-    "fail_interrupted",
+    "fail_interrupted_reports",
 ]

@@ -4,7 +4,7 @@ from report_analyst.domain import Passage
 from report_analyst.pdf import Block, BlockKind
 
 
-def split(blocks: list[Block], max_words: int = 250) -> list[Passage]:
+def split_into_passages(blocks: list[Block], max_words: int = 250) -> list[Passage]:
     """Group consecutive Blocks into Passages of up to `max_words` words.
 
     A Passage never spans two pages, so its Evidence has exactly one page number. A heading
@@ -20,31 +20,34 @@ def split(blocks: list[Block], max_words: int = 250) -> list[Passage]:
     """
     passages: list[Passage] = []
     heading = ""
-    group: list[Block] = []
+    current_blocks: list[Block] = []
 
-    def flush() -> None:
-        if group:
+    def close_passage() -> None:
+        if current_blocks:
             passages.append(
                 Passage(
                     index=len(passages),
-                    page=group[0].page,
+                    page=current_blocks[0].page,
                     heading=heading,
-                    blocks=list(group),
+                    blocks=list(current_blocks),
                 )
             )
-            group.clear()
+            current_blocks.clear()
 
     for block in blocks:
         if block.kind is BlockKind.HEADING:
-            flush()
+            close_passage()
             heading = block.text
             continue
-        if group and (block.page != group[0].page or _words(group) + _words([block]) > max_words):
-            flush()
-        group.append(block)
-    flush()
+        if current_blocks and (
+            block.page != current_blocks[0].page
+            or _word_count(current_blocks) + _word_count([block]) > max_words
+        ):
+            close_passage()
+        current_blocks.append(block)
+    close_passage()
     return passages
 
 
-def _words(blocks: list[Block]) -> int:
+def _word_count(blocks: list[Block]) -> int:
     return sum(len(b.text.split()) for b in blocks)

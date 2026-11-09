@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from report_analyst.index import BM25, HybridIndex, tokenize
 from report_analyst.pdf import Block, BlockKind, PageBox
 from report_analyst.reports import ReportRepository, Retriever
-from report_analyst.reports.splitting import split
+from report_analyst.reports.splitting import split_into_passages
 from report_analyst.settings import AppSettings
 from conftest import WHOLE_PAGE, FakeEmbedder, upload
 
@@ -42,7 +42,7 @@ def test_splitter_keeps_pages_apart_and_carries_headings() -> None:
         block(2, BlockKind.TABLE, "| FTE | 9,000 | in | 2025 | group |"),
     ]
 
-    passages = split(blocks, max_words=4)
+    passages = split_into_passages(blocks, max_words=4)
 
     assert [(p.index, p.page, p.heading, p.text) for p in passages] == [
         (0, 1, "Climate", "We aim for net zero."),  # 5 words: the next block starts anew
@@ -58,7 +58,7 @@ def test_passage_keeps_its_blocks() -> None:
     box = PageBox(x=0.1, y=0.2, width=0.3, height=0.4)
     blocks = [Block(page=1, kind=BlockKind.TEXT, text=t, box=box) for t in ("a", "b")]
 
-    [passage] = split(blocks)
+    [passage] = split_into_passages(blocks)
 
     assert passage.blocks == blocks
     assert passage.text == "a\n\nb"
@@ -71,7 +71,7 @@ def test_upload_indexes_the_report_for_search(
     upload(client, make_pdf("Revenue grew strongly this year."), reporting_year="2023")
 
     retriever = Retriever(ReportRepository(settings.reports_dir), FakeEmbedder())
-    [hit] = retriever.search(UUID(report_id["report_id"]), "net zero target", k=1)
+    [hit] = retriever.search(UUID(report_id["report_id"]), "net zero target", limit=1)
 
     assert hit.page == 1
     assert "net zero emissions" in hit.text
@@ -99,7 +99,9 @@ def test_search_sees_passages_saved_again(tmp_path: Path) -> None:
     retriever = Retriever(repository, FakeEmbedder())
 
     def save(text: str) -> None:
-        passages = split([Block(page=1, kind=BlockKind.TEXT, text=text, box=WHOLE_PAGE)])
+        passages = split_into_passages(
+            [Block(page=1, kind=BlockKind.TEXT, text=text, box=WHOLE_PAGE)]
+        )
         repository.save_contents(report.report_id, [], passages, retriever.embed(passages))
 
     save("Net zero by 2050.")

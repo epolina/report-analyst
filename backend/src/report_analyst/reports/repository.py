@@ -21,7 +21,7 @@ _EMBEDDINGS_FILE = "embeddings.npy"  # row i embeds passage i
 _METADATA_FILE = "metadata.json"
 _FACTS_FILE = "facts.json"
 _PAGE_IMAGES_DIR = "page-images"  # <n>.jpg
-_PASSAGES = TypeAdapter(list[Passage])
+_PASSAGE_LIST = TypeAdapter(list[Passage])
 
 
 class _StoredReport(Report):
@@ -37,7 +37,7 @@ def _sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
-def _public(stored: _StoredReport) -> Report:
+def _to_report(stored: _StoredReport) -> Report:
     return Report.model_validate(stored.model_dump(exclude={"original_filename"}))
 
 
@@ -55,8 +55,8 @@ class ReportRepository:
         Args:
             reports_dir: The folder that holds one sub-folder per report.
         """
-        self._dir = reports_dir
-        self._dir.mkdir(parents=True, exist_ok=True)
+        self._reports_dir = reports_dir
+        self._reports_dir.mkdir(parents=True, exist_ok=True)
 
     def create(
         self,
@@ -91,7 +91,7 @@ class ReportRepository:
             status=ReportStatus.PROCESSING,
             original_filename=original_filename,
         )
-        folder = self._dir / str(stored.report_id)
+        folder = self._reports_dir / str(stored.report_id)
         folder.mkdir(exist_ok=True)
         # A replaced PDF has other text, pages and facts; the old ones must not be served.
         shutil.rmtree(folder / _PAGE_IMAGES_DIR, ignore_errors=True)
@@ -100,7 +100,7 @@ class ReportRepository:
         # Metadata last: a report with metadata always has its PDF.
         write_atomic(folder / _PDF_FILE, content)
         self._write_metadata(stored)
-        return _public(stored)
+        return _to_report(stored)
 
     def save_contents(
         self,
@@ -117,7 +117,7 @@ class ReportRepository:
             passages: The text extracted from the PDF, grouped for search.
             embeddings: One row per passage, in the same order.
         """
-        folder = self._dir / str(report_id)
+        folder = self._reports_dir / str(report_id)
         (folder / _PAGE_IMAGES_DIR).mkdir(exist_ok=True)
         for number, image in enumerate(images, start=1):
             write_atomic(folder / _PAGE_IMAGES_DIR / f"{number}.jpg", image)
@@ -136,11 +136,11 @@ class ReportRepository:
         Returns:
             The updated report.
         """
-        path = self._dir / str(report_id) / _METADATA_FILE
+        path = self._reports_dir / str(report_id) / _METADATA_FILE
         stored = _StoredReport.model_validate_json(path.read_bytes())
         stored = stored.model_copy(update={"status": status, "failure": failure})
         self._write_metadata(stored)
-        return _public(stored)
+        return _to_report(stored)
 
     def pdf(self, report_id: UUID) -> bytes:
         """Get a stored report's PDF.
@@ -151,7 +151,7 @@ class ReportRepository:
         Returns:
             The PDF bytes.
         """
-        return (self._dir / str(report_id) / _PDF_FILE).read_bytes()
+        return (self._reports_dir / str(report_id) / _PDF_FILE).read_bytes()
 
     def get(self, report_id: UUID) -> Report | None:
         """Get a stored report.
@@ -162,7 +162,7 @@ class ReportRepository:
         Returns:
             The report, or None if there's no such report.
         """
-        path = self._dir / str(report_id) / _METADATA_FILE
+        path = self._reports_dir / str(report_id) / _METADATA_FILE
         return Report.model_validate_json(path.read_bytes()) if path.exists() else None
 
     def passages(self, report_id: UUID) -> list[Passage]:
@@ -174,7 +174,9 @@ class ReportRepository:
         Returns:
             The Passages by index.
         """
-        return _PASSAGES.validate_json((self._dir / str(report_id) / _PASSAGES_FILE).read_bytes())
+        return _PASSAGE_LIST.validate_json(
+            (self._reports_dir / str(report_id) / _PASSAGES_FILE).read_bytes()
+        )
 
     def passages_version(self, report_id: UUID) -> int | None:
         """Tell whether a report's Passages changed, e.g. to refresh a cache of them.
@@ -185,7 +187,7 @@ class ReportRepository:
         Returns:
             A number that changes whenever the Passages are saved again; None if there are none.
         """
-        path = self._dir / str(report_id) / _PASSAGES_FILE
+        path = self._reports_dir / str(report_id) / _PASSAGES_FILE
         return path.stat().st_mtime_ns if path.exists() else None
 
     def embeddings(self, report_id: UUID) -> Vectors:
@@ -197,7 +199,7 @@ class ReportRepository:
         Returns:
             One row per passage.
         """
-        vectors: Vectors = np.load(self._dir / str(report_id) / _EMBEDDINGS_FILE)
+        vectors: Vectors = np.load(self._reports_dir / str(report_id) / _EMBEDDINGS_FILE)
         return vectors
 
     def facts(self, report_id: UUID) -> Facts | None:
@@ -209,7 +211,7 @@ class ReportRepository:
         Returns:
             The Facts, or None if none are saved yet.
         """
-        path = self._dir / str(report_id) / _FACTS_FILE
+        path = self._reports_dir / str(report_id) / _FACTS_FILE
         return Facts.model_validate_json(path.read_bytes()) if path.exists() else None
 
     def save_facts(self, report_id: UUID, facts: Facts) -> None:
@@ -220,25 +222,26 @@ class ReportRepository:
             facts: The Facts.
         """
         write_atomic(
-            self._dir / str(report_id) / _FACTS_FILE, facts.model_dump_json(indent=2).encode()
+            self._reports_dir / str(report_id) / _FACTS_FILE,
+            facts.model_dump_json(indent=2).encode(),
         )
 
-    def page_image(self, report_id: UUID, number: int) -> bytes | None:
+    def page_image(self, report_id: UUID, page_number: int) -> bytes | None:
         """Get a page image.
 
         Args:
             report_id: The report's id.
-            number: The page number, starting at 1.
+            page_number: The page number, starting at 1.
 
         Returns:
             The JPEG bytes, or None if there's no such report or page.
         """
-        path = self._dir / str(report_id) / _PAGE_IMAGES_DIR / f"{number}.jpg"
+        path = self._reports_dir / str(report_id) / _PAGE_IMAGES_DIR / f"{page_number}.jpg"
         return path.read_bytes() if path.exists() else None
 
     def _write_metadata(self, stored: _StoredReport) -> None:
         write_atomic(
-            self._dir / str(stored.report_id) / _METADATA_FILE,
+            self._reports_dir / str(stored.report_id) / _METADATA_FILE,
             stored.model_dump_json(indent=2).encode(),
         )
 
@@ -250,7 +253,7 @@ class ReportRepository:
         np.save(vectors, embeddings)
         # Embeddings first: passages.json without its embeddings would mis-align search.
         write_atomic(folder / _EMBEDDINGS_FILE, vectors.getvalue())
-        write_atomic(folder / _PASSAGES_FILE, _PASSAGES.dump_json(passages, indent=2))
+        write_atomic(folder / _PASSAGES_FILE, _PASSAGE_LIST.dump_json(passages, indent=2))
 
     def list(self) -> list[Report]:
         """List the stored reports.
@@ -262,6 +265,6 @@ class ReportRepository:
         # `Report` ignores the extra fields, such as the original file name.
         reports = [
             Report.model_validate_json(p.read_bytes())
-            for p in self._dir.glob(f"*/{_METADATA_FILE}")
+            for p in self._reports_dir.glob(f"*/{_METADATA_FILE}")
         ]
         return sorted(reports, key=lambda r: (r.company_name.casefold(), r.reporting_year))

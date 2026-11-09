@@ -8,10 +8,10 @@ from report_analyst.llm import AnthropicLLM
 
 
 type Search = Callable[[str, int], list[Passage]]
-"""Finds up to `k` Passages of the report for a query, best first."""
+"""Finds up to `limit` Passages of the report for a query, best first."""
 
-# One search per kind of fact; the passages found are all Claude reads. Tune the queries (or k)
-# if a known goal goes missing.
+# One search per kind of fact; the passages found are all Claude reads. Tune the queries (or
+# _HITS_PER_QUERY) if a known goal goes missing.
 _QUERIES = [
     "total number of employees in full-time equivalents (FTE)",
     "greenhouse gas emissions reduction target net zero scope 1 2 3",
