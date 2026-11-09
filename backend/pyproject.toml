@@ -6,12 +6,13 @@ build-backend = "setuptools.build_meta"
 name = "report-analyst"
 version = "0.1.0"
 description = "Answers questions about annual reports with verbatim, page-cited evidence."
-requires-python = ">=3.14"
+requires-python = ">=3.14,<3.15"
 dependencies = [
     "anthropic~=2.4",
     "fastapi~=0.162.0",
     "fastembed~=0.9.1",  # bge-small embeddings on ONNX, no PyTorch
     "instructor~=1.17",
+    "langwatch~=1.4",
     "mistralai~=3.7",  # Mistral OCR, the PDF text extraction
     "numpy~=2.5",
     "pillow~=13.0",
@@ -23,6 +24,7 @@ dependencies = [
     ### Version pins to address security vulnerabilities: ###
     ###################################################################
     "certifi>=2026.10.19",  # solves GHSA-6q48-6c7w-9gw2
+    "openinference-instrumentation-anthropic>=3.3.1",
 ]
 
 [dependency-groups]

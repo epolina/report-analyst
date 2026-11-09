@@ -1,16 +1,21 @@
 """FastAPI app: creates the app and includes the routers."""
 
+import langwatch
 import logging
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from openinference.instrumentation.anthropic import AnthropicInstrumentor
 
+from report_analyst import langwatch_agent  # ruff: ignore[unused-import]  registers the LangWatch connect function
 from report_analyst.reports import ReportRepository, fail_interrupted
 from report_analyst.routers import chat, health, reports, uploads
 from report_analyst.routers.dependencies import get_settings
 from report_analyst.routers.errors import ApiError, handle_api_error
 
+
+langwatch.setup(instrumentors=[AnthropicInstrumentor()])
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
