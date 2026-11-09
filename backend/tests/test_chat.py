@@ -149,7 +149,7 @@ def test_scope_comes_from_the_question_then_the_ui() -> None:
 def test_tables_go_in_by_row_and_come_back_by_row() -> None:
     from anthropic.types.beta import BetaCitationContentBlockLocation
 
-    from report_analyst.chat.service import _body
+    from report_analyst.chat.service import _document_body
     from report_analyst.domain import Passage
     from report_analyst.pdf import Block, BlockKind
     from report_analyst.llm import _cited_text
@@ -163,8 +163,8 @@ def test_tables_go_in_by_row_and_come_back_by_row() -> None:
         )
 
     table = "Key figures\n\n| | 2025 |\n| --- | --- |\n| FTE | 23,126 |\n| NIM | 152 |"
-    assert _body(passage("We aim. We act.")) == "We aim. We act."
-    rows = _body(passage(table))
+    assert _document_body(passage("We aim. We act.")) == "We aim. We act."
+    rows = _document_body(passage(table))
     assert rows == [
         "Key figures",
         "| | 2025 |",

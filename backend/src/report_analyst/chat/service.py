@@ -19,12 +19,13 @@ from report_analyst.llm import AnthropicLLM, CitedAnswer
 from report_analyst.reports import ReportRepository, Retriever
 
 
-_PASSAGES_SHOWN = 24  # split across the reports searched, at least _MIN_PER_REPORT each
-_MIN_PER_REPORT = 4
-_HISTORY_TURNS = 3  # earlier Turns shown to the model, so follow-ups make sense
-_YEAR = re.compile(r"\b(?:19|20)\d\d\b")
+# Split across the reports searched, at least _MIN_PASSAGES_PER_REPORT each.
+_MAX_PASSAGES_TOTAL = 24
+_MIN_PASSAGES_PER_REPORT = 4
+_HISTORY_TURNS_IN_PROMPT = 3  # earlier Turns shown to the model, so follow-ups make sense
+_YEAR_PATTERN = re.compile(r"\b(?:19|20)\d\d\b")
 
-_PROMPT = """\
+_PROMPT_TEMPLATE = """\
 The documents above are passages from companies' annual reports; each title names the report
 and page. Answer the question using only them.
 
@@ -36,7 +37,7 @@ and cite nothing: an honest "not found" is better than a guess."""
 
 
 # The Passages found, each with its report. A citation's document index is a position here.
-type _Found = list[tuple[Report, Passage]]
+type _ReportPassages = list[tuple[Report, Passage]]
 
 
 class ConversationNotFoundError(Exception):
@@ -86,38 +87,46 @@ class ChatService:
         """
         if conversation_id is None:
             conversation = Conversation()
-        elif (found := self._conversations.get(conversation_id)) is None:
+        elif (stored_conversation := self._conversations.get(conversation_id)) is None:
             raise ConversationNotFoundError
         else:
-            conversation = found
+            conversation = stored_conversation
         all_reports = self._reports.list()
-        scope = resolve_scope(question, scope, all_reports)
-        answer = self._answer(question, scope, all_reports, conversation.turns)
-        turn = Turn(question=question, scope=scope, answer=answer)
+        resolved_scope = resolve_scope(question, scope, all_reports)
+        answer = self._build_answer(question, resolved_scope, all_reports, conversation.turns)
+        turn = Turn(question=question, scope=resolved_scope, answer=answer)
         # Two Questions at once in one Conversation: the last save wins.
         conversation.turns.append(turn)
         self._conversations.save(conversation)
         return ChatReply(conversation_id=conversation.conversation_id, **turn.model_dump())
 
-    def _answer(
+    def _build_answer(
         self, question: str, scope: Scope, all_reports: list[Report], history: list[Turn]
     ) -> Answer:
-        ready = _ready_reports(all_reports, scope)
-        if isinstance(ready, NotFoundReason):
-            return _not_found(ready)
-        found = self._search(question, history, ready)
-        if not found:
+        searchable_reports = _searchable_reports_in_scope(all_reports, scope)
+        if isinstance(searchable_reports, NotFoundReason):
+            return _not_found(searchable_reports)
+        found_passages = self._search_passages(question, history, searchable_reports)
+        if not found_passages:
             return _not_found(NotFoundReason.NOT_IN_REPORT)
-        cited = self._llm.cite(_prompt(question, history), _documents(found))
-        return _to_answer(cited, found)
+        cited_answer = self._llm.cite(
+            _build_prompt(question, history), _passages_as_documents(found_passages)
+        )
+        return _to_answer(cited_answer, found_passages)
 
-    def _search(self, question: str, history: list[Turn], ready: list[Report]) -> _Found:
+    def _search_passages(
+        self, question: str, history: list[Turn], searchable_reports: list[Report]
+    ) -> _ReportPassages:
         # A follow-up such as "and in 2025?" searches badly alone, so the previous Question
         # joins the query.
         query = f"{history[-1].question} {question}" if history else question
-        per_report = max(_MIN_PER_REPORT, _PASSAGES_SHOWN // len(ready))
+        passages_per_report = max(
+            _MIN_PASSAGES_PER_REPORT, _MAX_PASSAGES_TOTAL // len(searchable_reports)
+        )
         return [
-            (r, p) for r in ready for p in self._retriever.search(r.report_id, query, per_report)
+            (report, passage)
+            for report in searchable_reports
+            for passage in self._retriever.search(report.report_id, query, passages_per_report)
         ]
 
 
@@ -135,66 +144,71 @@ def resolve_scope(question: str, scope: Scope, reports: list[Report]) -> Scope:
     Returns:
         The scope to search.
     """
-    companies = {
+    companies_named = {
         r.company_name
         for r in reports
         if re.search(rf"\b{re.escape(r.company_name)}\b", question, re.IGNORECASE)
     }
-    years = {int(y) for y in _YEAR.findall(question)} & {r.year for r in reports}
+    years_named = {int(y) for y in _YEAR_PATTERN.findall(question)} & {r.year for r in reports}
     return Scope(
-        company=_pick(companies, scope.company),
-        reporting_year=_pick(years, scope.reporting_year),
+        company=_scope_field(companies_named, scope.company),
+        reporting_year=_scope_field(years_named, scope.reporting_year),
     )
 
 
-def _pick[T](named: set[T], chosen: T | None) -> T | None:
-    if len(named) == 1:
-        return next(iter(named))
-    return None if named else chosen
+def _scope_field[T](named_in_question: set[T], chosen_in_ui: T | None) -> T | None:
+    if len(named_in_question) == 1:
+        return next(iter(named_in_question))
+    return None if named_in_question else chosen_in_ui
 
 
-def _body(passage: Passage) -> str | list[str]:
+def _document_body(passage: Passage) -> str | list[str]:
     # A passage with a Markdown table goes in one line per block, so Claude cites the rows it
     # used, not the whole table (a table has no sentences to cite by). Prose stays text.
     lines = [line for line in passage.text.splitlines() if line.strip()]
     return lines if any(line.lstrip().startswith("|") for line in lines) else passage.text
 
 
-def _ready_reports(all_reports: list[Report], scope: Scope) -> list[Report] | NotFoundReason:
+def _searchable_reports_in_scope(
+    all_reports: list[Report], scope: Scope
+) -> list[Report] | NotFoundReason:
     # The reports in scope that can be searched, or why none can.
-    in_scope = [r for r in all_reports if _matches(r, scope)]
+    in_scope = [r for r in all_reports if _report_in_scope(r, scope)]
     if not in_scope:
         return NotFoundReason.NO_REPORT
-    ready = [r for r in in_scope if r.status is ReportStatus.SUCCESS]
-    return ready or NotFoundReason.REPORT_NOT_READY
+    searchable = [r for r in in_scope if r.status is ReportStatus.SUCCESS]
+    return searchable or NotFoundReason.REPORT_NOT_READY
 
 
-def _prompt(question: str, history: list[Turn]) -> str:
+def _build_prompt(question: str, history: list[Turn]) -> str:
     # An empty answer is a Not Found the app decided; Claude still needs to know there was one.
-    return _PROMPT.format(
+    return _PROMPT_TEMPLATE.format(
         history="".join(
-            f"Earlier question: {t.question}\n"
-            f"Earlier answer: {t.answer.text or '(not found in the reports)'}\n\n"
-            for t in history[-_HISTORY_TURNS:]
+            f"Earlier question: {turn.question}\n"
+            f"Earlier answer: {turn.answer.text or '(not found in the reports)'}\n\n"
+            for turn in history[-_HISTORY_TURNS_IN_PROMPT:]
         ),
         question=question,
     )
 
 
-def _documents(found: _Found) -> list[tuple[str, str | list[str]]]:
+def _passages_as_documents(found_passages: _ReportPassages) -> list[tuple[str, str | list[str]]]:
     # One document per Passage, titled with its report and page.
-    return [(f"{r.company_name} {r.year}, page {p.page}", _body(p)) for r, p in found]
+    return [
+        (f"{r.company_name} {r.year}, page {p.page}", _document_body(p)) for r, p in found_passages
+    ]
 
 
-def _to_answer(cited: CitedAnswer, found: _Found) -> Answer:
+def _to_answer(cited_answer: CitedAnswer, found_passages: _ReportPassages) -> Answer:
     # Each citation becomes Evidence from its Passage. No citation means nothing in the reports
     # backs the text: Not Found, whatever it says.
-    evidence: dict[tuple[int, str], ChatEvidence] = {}
-    for c in cited.citations:
-        report, passage = found[c.document]
-        quote = c.text.strip()
-        if quote and (c.document, quote) not in evidence:  # Claude may cite a span twice
-            evidence[c.document, quote] = ChatEvidence(
+    evidence_by_quote: dict[tuple[int, str], ChatEvidence] = {}
+    for citation in cited_answer.citations:
+        report, passage = found_passages[citation.document]
+        quote = citation.text.strip()
+        # Claude may cite a span twice
+        if quote and (citation.document, quote) not in evidence_by_quote:
+            evidence_by_quote[citation.document, quote] = ChatEvidence(
                 page=passage.page,
                 quote=quote,
                 boxes=passage.boxes_of(quote),
@@ -202,12 +216,12 @@ def _to_answer(cited: CitedAnswer, found: _Found) -> Answer:
                 company_name=report.company_name,
                 year=report.year,
             )
-    if not evidence:
-        return _not_found(NotFoundReason.NOT_IN_REPORT, cited.text)
-    return Answer(kind="answer", text=cited.text, evidence=list(evidence.values()))
+    if not evidence_by_quote:
+        return _not_found(NotFoundReason.NOT_IN_REPORT, cited_answer.text)
+    return Answer(kind="answer", text=cited_answer.text, evidence=list(evidence_by_quote.values()))
 
 
-def _matches(report: Report, scope: Scope) -> bool:
+def _report_in_scope(report: Report, scope: Scope) -> bool:
     return (
         scope.company is None or report.company_name.casefold() == scope.company.casefold()
     ) and (scope.reporting_year is None or report.year == scope.reporting_year)
