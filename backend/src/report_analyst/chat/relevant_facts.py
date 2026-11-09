@@ -81,12 +81,16 @@ def collect_relevant_facts(
 
 
 def _reports_for_pair(pair: CompanyYearPair, stored_reports: list[Report]) -> list[Report]:
-    # The same Company (ignoring case), and the year asked or else its latest one. Usually one
-    # report; more if the user kept both of two uploads for the same Company and year.
+    # The same Company, ignoring case.
     company_reports = [
         r for r in stored_reports if r.company_name.casefold() == pair.company_name.casefold()
     ]
     if not company_reports:
         return []
-    year = pair.reporting_year or max(r.reporting_year for r in company_reports)
+    # The year asked; if the Question names none, the Company's latest stored year.
+    if pair.reporting_year is not None:
+        year = pair.reporting_year
+    else:
+        year = max(r.reporting_year for r in company_reports)
+    # Usually one report; more if the user kept both of two uploads for that Company and year.
     return [r for r in company_reports if r.reporting_year == year]
