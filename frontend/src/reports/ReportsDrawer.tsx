@@ -1,6 +1,7 @@
 // The Reports drawer: the list with its filters, or one report with its FTE, goals and PDF.
 import { useEffect, useState } from "react";
 import {
+  failureMessage,
   getReport,
   isProcessing,
   retryReport,
@@ -8,8 +9,7 @@ import {
   type Report,
   type ReportDetail,
   type ReportStatus,
-} from "./api";
-import { failureMessage } from "./messages";
+} from "../api";
 import { ADD_REPORT, ALL_COMPANIES, ANY_YEAR, companiesOf, unique, yearsOf } from "./options";
 import { ReportView } from "./ReportView";
 import {
@@ -25,7 +25,7 @@ import {
   Skeleton,
   Status,
   type TableGroup,
-} from "./ui";
+} from "../ui";
 
 const STATUS_BADGES: Record<ReportStatus, { tone: "ok" | "busy" | "bad"; label: string }> = {
   processing: { tone: "busy", label: "Processing" },

@@ -66,14 +66,17 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
     └── src/
         ├── main.tsx            # mounts App
         ├── App.tsx             # the layout, the report list and the drawer; shared state
-        ├── ChatPanel.tsx       # useChat, ChatComposer, ChatThread
-        ├── ReportsDrawer.tsx   # the list with filters, or one report with retry
-        ├── ReportView.tsx      # one ready report: its facts beside the page with the evidence
-        ├── UploadDialog.tsx    # the "Add a report" popup and its duplicate question
-        ├── api.ts, api.gen.ts  # backend calls; types generated from the OpenAPI schema
-        ├── options.ts          # labels and options shared by the filters and the chat scope
-        ├── messages.ts         # the user's wording for every error, failure and Not Found code
-        ├── *.test.tsx          # vitest: the upload dialog, and the app staying up through a chat
+        ├── App.test.tsx        # vitest: the app staying up through a chat
+        ├── api/                # import from "api": index.ts re-exports the two below
+        │   ├── client.ts, api.gen.ts  # backend calls; types generated from the OpenAPI schema
+        │   └── messages.ts     # the user's wording for every error, failure and Not Found code
+        ├── chat/
+        │   └── ChatPanel.tsx   # useChat, ChatComposer, ChatThread
+        ├── reports/
+        │   ├── ReportsDrawer.tsx  # the list with filters, or one report with retry
+        │   ├── ReportView.tsx  # one ready report: its facts beside the page with the evidence
+        │   ├── UploadDialog.tsx   # the "Add a report" popup and its duplicate question (+ test)
+        │   └── options.ts      # labels and options shared by the filters and the chat scope
         └── ui/                 # the component library: tokens.css, one .tsx + .css per area
 ```
 
@@ -101,10 +104,10 @@ Chat quotes come from the API's citations, not from the model's own copy: each P
 
 ## Frontend
 
-- **API contract.** The backend's Pydantic models are the source of truth. `npm run gen:api` dumps FastAPI's OpenAPI schema to `frontend/openapi.json` and generates `src/api.gen.ts`; `api.ts` re-exports the types under domain names. Change a backend model, run `gen:api`, and `npm run typecheck` shows every place the UI must follow.
+- **API contract.** The backend's Pydantic models are the source of truth. `npm run gen:api` dumps FastAPI's OpenAPI schema to `frontend/openapi.json` and generates `src/api/api.gen.ts`; `api/client.ts` re-exports the types under domain names. Change a backend model, run `gen:api`, and `npm run typecheck` shows every place the UI must follow.
 - **Base path.** The browser calls `/api/uploads`; Vite (dev) and nginx (Docker) strip `/api` and forward to the backend, so there is no CORS.
 - **Design tokens.** All raw values live in `ui/tokens.css`. Each component file in `ui/` has its stylesheet next to it (`chat.css`, `list.css`, …), using only tokens, enforced by stylelint. Screens compose `ui/` components and never write CSS or class names. A new look means a new component in `ui/`, not a style in a screen.
-- **Screens.** `App.tsx` lays out the page and holds the state the chat and the drawer share; `ChatPanel.tsx` (the chat, with `useChat`) and `ReportsDrawer.tsx` (the list and one report) hold their own. `mockup/combined/b-chat-first.html` is the reference layout.
+- **Screens.** `App.tsx` lays out the page and holds the state the chat and the drawer share; `chat/ChatPanel.tsx` (the chat, with `useChat`) and `reports/ReportsDrawer.tsx` (the list and one report) hold their own. `mockup/combined/b-chat-first.html` is the reference layout.
 
 ## Persistence
 

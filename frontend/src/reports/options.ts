@@ -1,5 +1,5 @@
 // What the report filters and the chat scope offer, so the two always read the same.
-import type { Report } from "./api";
+import type { Report } from "../api";
 
 export const ALL_COMPANIES = "All companies";
 export const ANY_YEAR = "Any year";

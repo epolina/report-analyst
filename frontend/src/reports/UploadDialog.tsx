@@ -1,8 +1,7 @@
 // The "Add a report" popup: the user picks the PDF and types the Company and Reporting Year.
 import { useState, type FormEvent } from "react";
-import { ApiError, uploadReport, type Duplicate, type OnDuplicate, type Report } from "./api";
-import { ERROR_MESSAGES } from "./messages";
-import { Button, Dialog, Field, Note } from "./ui";
+import { ApiError, ERROR_MESSAGES, uploadReport, type Duplicate, type OnDuplicate, type Report } from "../api";
+import { Button, Dialog, Field, Note } from "../ui";
 
 // Checked before sending, so the common mistakes don't need a round trip. The backend checks again.
 function validateUpload(file: File | undefined, company: string, year: string): string {

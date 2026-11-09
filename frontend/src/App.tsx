@@ -2,10 +2,10 @@
 // right. Evidence in an Answer opens its report in the drawer at the quoted page.
 import { useEffect, useState } from "react";
 import { isProcessing, listReports, type ChatEvidence, type Report } from "./api";
-import { ChatComposer, ChatThread, useChat } from "./ChatPanel";
-import { ADD_REPORT } from "./options";
-import { ReportsDrawer } from "./ReportsDrawer";
-import { UploadDialog } from "./UploadDialog";
+import { ChatComposer, ChatThread, useChat } from "./chat/ChatPanel";
+import { ADD_REPORT } from "./reports/options";
+import { ReportsDrawer } from "./reports/ReportsDrawer";
+import { UploadDialog } from "./reports/UploadDialog";
 import { Button, EmptyState, Shell, TopBarButton } from "./ui";
 
 // While a report is processing, the list is fetched this often to follow its status.

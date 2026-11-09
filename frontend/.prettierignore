@@ -1,4 +1,4 @@
 dist
 package-lock.json
 openapi.json
-src/api.gen.ts
+src/api/api.gen.ts

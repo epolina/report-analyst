@@ -1,9 +1,16 @@
 // The chat: its Turns, the Question being answered, and the scope selects under the composer.
 // `useChat` holds the state; the layout places the thread and the composer in different slots.
 import { useEffect, useState } from "react";
-import { askQuestion, getConversation, type ChatEvidence, type Report, type Scope, type Turn } from "./api";
-import { NOT_FOUND_MESSAGES } from "./messages";
-import { ALL_COMPANIES, ANY_YEAR, companiesOf, yearsOf } from "./options";
+import {
+  askQuestion,
+  getConversation,
+  NOT_FOUND_MESSAGES,
+  type ChatEvidence,
+  type Report,
+  type Scope,
+  type Turn,
+} from "../api";
+import { ALL_COMPANIES, ANY_YEAR, companiesOf, yearsOf } from "../reports/options";
 import {
   Answer,
   ChatStart,
@@ -15,7 +22,7 @@ import {
   Select,
   Thinking,
   Thread,
-} from "./ui";
+} from "../ui";
 
 // The open Conversation's id, so a reload shows it again.
 const CONVERSATION_KEY = "conversation";

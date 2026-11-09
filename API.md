@@ -87,7 +87,7 @@
 ## Rules
 
 - Not Found is a `200` answer, not an error. HTTP errors are for bad input or a broken backend.
-- The backend sends codes, never copy. An error is `{"code": ErrorCode, ...}` (`ErrorOut`, `ExistingReportOut`, `TooLargeOut`); `failure` and Not Found `reason` are codes too. The frontend words them all in `src/messages.ts`. Only FastAPI's own 422 validation error keeps its `{"detail": [...]}`.
+- The backend sends codes, never copy. An error is `{"code": ErrorCode, ...}` (`ErrorOut`, `ExistingReportOut`, `TooLargeOut`); `failure` and Not Found `reason` are codes too. The frontend words them all in `src/api/messages.ts`. Only FastAPI's own 422 validation error keeps its `{"detail": [...]}`.
 - Answer `text` is plain text. Never HTML.
 - When a report is replaced, it keeps its `id`, so old Evidence still resolves.
 - The backend detects duplicates (409). The same file is refused; for the same Company and year the user decides: replace, or keep both. "Keep both" means a Company and year can have several reports.

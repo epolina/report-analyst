@@ -1,7 +1,7 @@
 // One ready report: its facts on the left and the page holding the selected Evidence on the right.
 import { useState } from "react";
-import { pageImageUrl, type Evidence, type ReportDetail } from "./api";
-import { Button, EmptyText, Fact, PageViewer, Section, Split } from "./ui";
+import { pageImageUrl, type Evidence, type ReportDetail } from "../api";
+import { Button, EmptyText, Fact, PageViewer, Section, Split } from "../ui";
 
 const formatNumber = (n: number) => n.toLocaleString("en-US");
 

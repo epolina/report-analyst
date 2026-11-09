@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "node node_modules/typescript-7/bin/tsc && vite build",
     "preview": "vite preview",
-    "gen:api": "cd ../backend && uv run python -c \"import json; from report_analyst.main import app; print(json.dumps(app.openapi(), indent=2))\" > ../frontend/openapi.json && cd ../frontend && npx -y openapi-typescript@7.13.0 openapi.json -o src/api.gen.ts",
+    "gen:api": "cd ../backend && uv run python -c \"import json; from report_analyst.main import app; print(json.dumps(app.openapi(), indent=2))\" > ../frontend/openapi.json && cd ../frontend && npx -y openapi-typescript@7.13.0 openapi.json -o src/api/api.gen.ts",
     "typecheck": "node node_modules/typescript-7/bin/tsc --noEmit",
     "lint": "eslint . && stylelint \"src/**/*.css\"",
     "format": "prettier --write .",
