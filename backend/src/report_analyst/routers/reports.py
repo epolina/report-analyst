@@ -8,7 +8,7 @@ from uuid import UUID
 from report_analyst.domain import Facts, Fte, Report, SustainabilityGoal
 from report_analyst.reports import NotFailedError, ReportRepository, ReportService
 from report_analyst.routers.dependencies import get_report_repository, get_report_service
-from report_analyst.routers.errors import ErrorCode, ErrorOut, error
+from report_analyst.routers.errors import ErrorCode, ErrorOut, api_error
 
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -63,7 +63,7 @@ def get_report(
     """
     report = repository.get(report_id)
     if report is None:
-        raise error(HTTPStatus.NOT_FOUND, ErrorCode.REPORT_NOT_FOUND)
+        raise api_error(HTTPStatus.NOT_FOUND, ErrorCode.REPORT_NOT_FOUND)
     facts = repository.facts(report_id) or Facts()
     return ReportDetail(
         **report.model_dump(),
@@ -99,11 +99,11 @@ def retry_report(
         ApiError: 404 `report_not_found`; 409 `not_failed`.
     """
     if repository.get(report_id) is None:
-        raise error(HTTPStatus.NOT_FOUND, ErrorCode.REPORT_NOT_FOUND)
+        raise api_error(HTTPStatus.NOT_FOUND, ErrorCode.REPORT_NOT_FOUND)
     try:
         return service.retry(report_id)
     except NotFailedError as exc:
-        raise error(HTTPStatus.CONFLICT, ErrorCode.NOT_FAILED) from exc
+        raise api_error(HTTPStatus.CONFLICT, ErrorCode.NOT_FAILED) from exc
 
 
 @router.get(
@@ -133,5 +133,5 @@ def get_page(
         ApiError: 404 `page_not_found`, also for an unknown report.
     """
     if (image := repository.page_image(report_id, number)) is None:
-        raise error(HTTPStatus.NOT_FOUND, ErrorCode.PAGE_NOT_FOUND)
+        raise api_error(HTTPStatus.NOT_FOUND, ErrorCode.PAGE_NOT_FOUND)
     return Response(image, media_type="image/jpeg")

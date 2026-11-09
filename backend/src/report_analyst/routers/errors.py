@@ -75,7 +75,7 @@ class ApiError(Exception):
         self.body = body
 
 
-def error(status: HTTPStatus, code: ErrorCode) -> ApiError:
+def api_error(status: HTTPStatus, code: ErrorCode) -> ApiError:
     """Build an error that carries only its code.
 
     Args:

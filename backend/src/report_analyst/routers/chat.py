@@ -16,7 +16,7 @@ from report_analyst.chat import (
 )
 from report_analyst.llm import LLMError
 from report_analyst.routers.dependencies import get_chat_service, get_conversation_repository
-from report_analyst.routers.errors import ErrorCode, ErrorOut, error
+from report_analyst.routers.errors import ErrorCode, ErrorOut, api_error
 
 
 router = APIRouter(tags=["chat"])
@@ -65,9 +65,9 @@ def ask(
     try:
         return service.ask(request.conversation_id, request.question, request.scope)
     except ConversationNotFoundError as exc:
-        raise error(HTTPStatus.NOT_FOUND, ErrorCode.CONVERSATION_NOT_FOUND) from exc
+        raise api_error(HTTPStatus.NOT_FOUND, ErrorCode.CONVERSATION_NOT_FOUND) from exc
     except LLMError as exc:
-        raise error(HTTPStatus.BAD_GATEWAY, ErrorCode.ANSWER_FAILED) from exc
+        raise api_error(HTTPStatus.BAD_GATEWAY, ErrorCode.ANSWER_FAILED) from exc
 
 
 @router.get(
@@ -90,5 +90,5 @@ def get_conversation(
         ApiError: 404 `conversation_not_found`.
     """
     if (conversation := conversations.get(conversation_id)) is None:
-        raise error(HTTPStatus.NOT_FOUND, ErrorCode.CONVERSATION_NOT_FOUND)
+        raise api_error(HTTPStatus.NOT_FOUND, ErrorCode.CONVERSATION_NOT_FOUND)
     return conversation

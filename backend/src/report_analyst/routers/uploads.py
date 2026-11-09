@@ -21,7 +21,7 @@ from report_analyst.routers.errors import (
     ErrorOut,
     ExistingOut,
     TooLargeOut,
-    error,
+    api_error,
 )
 from report_analyst.settings import AppSettings
 
@@ -81,16 +81,16 @@ def upload(
     try:
         return service.add(company_name, reporting_year, content, file.filename, on_duplicate)
     except NotAPdfError as exc:
-        raise error(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, ErrorCode.NOT_A_PDF) from exc
+        raise api_error(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, ErrorCode.NOT_A_PDF) from exc
     except UnreadablePdfError as exc:
-        raise error(HTTPStatus.UNPROCESSABLE_CONTENT, ErrorCode.UNREADABLE_PDF) from exc
+        raise api_error(HTTPStatus.UNPROCESSABLE_CONTENT, ErrorCode.UNREADABLE_PDF) from exc
     except StillProcessingError as exc:
-        raise _conflict(ErrorCode.STILL_PROCESSING, exc.existing) from exc
+        raise _conflict_error(ErrorCode.STILL_PROCESSING, exc.existing) from exc
     except SameFileError as exc:
-        raise _conflict(ErrorCode.SAME_FILE, exc.existing) from exc
+        raise _conflict_error(ErrorCode.SAME_FILE, exc.existing) from exc
     except SameCompanyYearError as exc:
-        raise _conflict(ErrorCode.SAME_COMPANY_YEAR, exc.existing) from exc
+        raise _conflict_error(ErrorCode.SAME_COMPANY_YEAR, exc.existing) from exc
 
 
-def _conflict(code: ErrorCode, existing: Report) -> ApiError:
+def _conflict_error(code: ErrorCode, existing: Report) -> ApiError:
     return ApiError(HTTPStatus.CONFLICT, ExistingOut(code=code, existing=existing))
