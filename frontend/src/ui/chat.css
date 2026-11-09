@@ -1,0 +1,217 @@
+/* The chat composer docked under the column. */
+
+/* ---------- composer ---------- */
+.ui-composer {
+  display: grid;
+  gap: var(--space-3);
+  max-width: var(--content-width);
+  margin: 0 auto;
+}
+
+.ui-scope {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-left: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.ui-ask {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.ui-ask input {
+  flex: 1;
+  min-width: 0;
+  height: var(--control-height-lg);
+  padding: 0 var(--space-8);
+  border: var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+
+.ui-ask input::placeholder {
+  color: var(--color-text-faint);
+}
+
+.ui-ask input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ui-ask .ui-button {
+  height: var(--control-height-lg);
+  padding: 0 var(--space-9);
+  border-radius: var(--radius-pill);
+}
+
+/* ---------- thread ---------- */
+.ui-thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-9);
+}
+
+.ui-chat-start {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-12);
+  text-align: center;
+}
+
+.ui-chat-start h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+}
+
+.ui-chat-start p {
+  color: var(--color-text-muted);
+}
+
+.ui-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.ui-chip {
+  padding: var(--space-2) var(--space-5);
+  border: var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.ui-chip:hover {
+  background: var(--color-hover);
+}
+
+.ui-question {
+  align-self: flex-end;
+  max-width: 80%;
+}
+
+.ui-bubble {
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-xs) var(--radius-lg);
+  background: var(--color-accent-tint);
+  color: var(--color-accent-text);
+  white-space: pre-wrap;
+}
+
+.ui-question-meta {
+  margin-top: var(--space-1);
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+  text-align: right;
+}
+
+.ui-answer {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.ui-answer > p {
+  font-size: var(--text-lg);
+  white-space: pre-wrap;
+}
+
+.ui-thinking span {
+  width: 70%;
+  height: var(--skeleton-height);
+  border-radius: var(--radius-xs);
+  background: var(--color-line);
+}
+
+.ui-thinking span:nth-child(2) {
+  width: 50%;
+}
+
+/* ---------- evidence ---------- */
+.ui-evidence {
+  padding: var(--space-4) var(--space-5);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.ui-evidence-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.ui-evidence-source {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: calc(-1 * var(--space-1));
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  text-align: left;
+}
+
+button.ui-evidence-source {
+  cursor: pointer;
+}
+
+button.ui-evidence-source:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
+.ui-evidence-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.ui-evidence-copy {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.ui-evidence-copy:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
+.ui-tag {
+  padding: 1px var(--space-3);
+  border-radius: var(--radius-xs);
+  background: var(--color-accent-tint);
+  color: var(--color-accent-text);
+}
+
+.ui-evidence[data-tone="muted"] .ui-tag {
+  background: var(--color-hover);
+  color: var(--color-text-muted);
+}
+
+.ui-evidence .ui-quote {
+  margin-top: var(--space-2);
+}
+
+.ui-evidence-note {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+}

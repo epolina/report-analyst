@@ -1,0 +1,101 @@
+/* The app frame (Shell) and the empty state. */
+
+/* ---------- app shell: chat column + sliding drawer ---------- */
+.ui-shell {
+  --drawer-open-width: 0px;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--drawer-open-width);
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  transition: grid-template-columns var(--duration-drawer) var(--ease-out);
+}
+
+.ui-shell[data-drawer="open"] {
+  --drawer-open-width: var(--drawer-width);
+}
+
+.ui-shell[data-drawer="wide"] {
+  --drawer-open-width: var(--drawer-width-wide);
+}
+
+.ui-shell-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ui-drawer {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-panel);
+}
+
+.ui-shell:not([data-drawer="closed"]) .ui-drawer {
+  border-left: var(--border);
+}
+
+.ui-dock {
+  flex: none;
+  padding: var(--space-3) var(--space-8) var(--space-9);
+}
+
+.ui-icon {
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+}
+
+.ui-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ui-topbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--topbar-height);
+  padding: 0 var(--space-8);
+}
+
+.ui-brand {
+  margin-right: auto;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.ui-main {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-9) var(--space-8) var(--space-3);
+}
+
+.ui-column {
+  display: grid;
+  gap: var(--space-5);
+  max-width: var(--content-width);
+  margin: 0 auto;
+}
+
+/* ---------- empty state ---------- */
+.ui-empty {
+  display: grid;
+  gap: var(--space-5);
+  justify-items: start;
+  padding: var(--space-12) 0 var(--space-9);
+}
+
+.ui-empty h2 {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+}
+
+.ui-empty p {
+  color: var(--color-text-muted);
+}

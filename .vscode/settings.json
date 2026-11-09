@@ -1,0 +1,13 @@
+{
+    "python.terminal.useEnvFile": true,
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.venv": true,
+      "**/__pycache__": true,
+      "**/.mypy_cache": true,
+      "**/.pytest_cache": true,
+      "**/.ruff_cache": true,
+      "**/*.egg-info": true,
+      "**/dist": true
+  }
+}

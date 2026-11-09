@@ -1,0 +1,202 @@
+/* One report: back link, sections, facts with their quote, the split and the page viewer. */
+
+/* ---------- report detail: back link, sections, facts with their quote ---------- */
+.ui-back {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.ui-back:hover {
+  color: var(--color-text);
+}
+
+.ui-pane-subtitle {
+  margin-top: calc(-1 * var(--space-3));
+  color: var(--color-text-muted);
+}
+
+.ui-shell[data-drawer="wide"] .ui-pane {
+  width: var(--drawer-width-wide);
+}
+
+.ui-section {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-5);
+}
+
+.ui-section h3 {
+  margin-bottom: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+/* A fact is a button that shows its page. */
+.ui-fact {
+  display: grid;
+  gap: var(--space-1);
+  width: calc(100% + 2 * var(--space-5));
+  margin: 0 calc(-1 * var(--space-5));
+  padding: var(--space-4) var(--space-5);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ui-fact:hover {
+  background: var(--color-hover);
+}
+
+.ui-fact[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tint);
+}
+
+.ui-fact-title {
+  font-weight: var(--weight-semibold);
+}
+
+.ui-fact[data-figure="true"] .ui-fact-title {
+  font-size: var(--text-figure);
+}
+
+.ui-fact-meta {
+  color: var(--color-text-muted);
+}
+
+.ui-quote {
+  max-width: 68ch;
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-family: var(--font-voice);
+  font-size: var(--text-md);
+  line-height: var(--leading-quote);
+}
+
+.ui-quote::before {
+  content: "\201C";
+}
+
+.ui-quote::after {
+  content: "\201D";
+}
+
+.ui-fact-page {
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+}
+
+.ui-fact[aria-pressed="true"] .ui-fact-page {
+  color: var(--color-accent-text);
+}
+
+/* ---------- split: facts left, page viewer right ---------- */
+.ui-split {
+  display: grid;
+  grid-template-columns: minmax(0, var(--split-left-width)) minmax(0, 1fr);
+  gap: var(--space-9);
+  align-items: start;
+}
+
+.ui-split-left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.ui-split-right {
+  position: sticky;
+  top: 0;
+  min-width: 0;
+}
+
+.ui-viewer {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.ui-viewer-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.ui-viewer-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-right: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-viewer-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  white-space: nowrap;
+}
+
+.ui-viewer-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--page-button-size);
+  height: var(--page-button-size);
+  border: var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.ui-viewer-nav button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.ui-viewer-nav button:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.ui-viewer-page {
+  position: relative;
+  overflow: hidden;
+  border: var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--color-page);
+}
+
+.ui-viewer-page img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Multiply keeps the page's text readable through the highlight. */
+.ui-viewer-page mark {
+  position: absolute;
+  padding: var(--highlight-pad);
+  margin: calc(-1 * var(--highlight-pad));
+  border-radius: var(--radius-xxs);
+  background: var(--color-highlight);
+  mix-blend-mode: multiply;
+}
+
+.ui-viewer-hint {
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+}

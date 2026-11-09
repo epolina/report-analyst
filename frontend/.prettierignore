@@ -1,0 +1,4 @@
+dist
+package-lock.json
+openapi.json
+src/api.gen.ts

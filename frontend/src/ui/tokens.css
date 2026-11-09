@@ -1,0 +1,131 @@
+/* Design tokens: the only place raw values live. stylelint rejects colours anywhere else.
+   Colours have a dark-mode set; everything else is shared. Values come from mockup/combined/base.css. */
+:root {
+  color-scheme: light dark;
+
+  /* colour: surfaces */
+  --color-bg: #f3f5f4;
+  --color-panel: #fafbfa;
+  --color-surface: #fff;
+  --color-hover: #ebefed;
+  --color-line: rgb(15 40 35 / 12%);
+  --color-line-strong: rgb(15 40 35 / 28%);
+  --color-backdrop: rgb(10 20 18 / 45%);
+  --color-page: #fff; /* paper stays white in dark mode, like the PDF */
+  --color-highlight: #bfeadb; /* evidence on the page; the page is white in both modes */
+
+  /* colour: text */
+  --color-text: #16211f;
+  --color-text-muted: #4a5754;
+  --color-text-faint: #5f6c69;
+
+  /* colour: accent (teal) */
+  --color-accent: #0f6e56;
+  --color-accent-hover: #0b5a46;
+  --color-on-accent: #fff;
+  --color-accent-tint: #dff3eb;
+  --color-accent-text: #064535;
+
+  /* colour: status */
+  --color-warn: #b07407;
+  --color-warn-tint: #fbf0da;
+  --color-warn-text: #6b4505;
+  --color-bad: #b3302f;
+  --color-bad-tint: #fcebeb;
+  --color-bad-text: #7c1d1d;
+
+  /* spacing */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 10px;
+  --space-5: 12px;
+  --space-6: 14px;
+  --space-7: 16px;
+  --space-8: 20px;
+  --space-9: 24px;
+  --space-12: 56px;
+
+  /* size */
+  --control-height: 32px;
+  --topbar-height: 52px;
+  --control-height-lg: 48px;
+  --drop-height: 44px;
+  --icon-size: 16px;
+  --dialog-width: 440px;
+  --drawer-width: min(440px, 100vw);
+  --drawer-width-wide: min(940px, 100vw);
+  --split-left-width: 320px;
+  --page-button-size: 28px;
+  --highlight-pad: 2px;
+  --filter-narrow-width: 84px;
+  --content-width: 760px;
+  --progress-height: 6px;
+  --dot-size: 8px;
+  --skeleton-height: 12px;
+
+  /* radius */
+  --radius-xxs: 2px;
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 24px;
+
+  /* border and focus */
+  --border-width: 1px;
+  --border: var(--border-width) solid var(--color-line);
+  --border-strong: var(--border-width) solid var(--color-line-strong);
+  --border-dashed: var(--border-width) dashed var(--color-line-strong);
+  --focus-ring: 2px solid var(--color-accent);
+
+  /* shadow */
+  --shadow-dialog: 0 12px 32px rgb(0 0 0 / 18%), 0 2px 6px rgb(0 0 0 / 12%);
+
+  /* typography */
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-voice: georgia, "Times New Roman", serif;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 15px;
+  --text-xl: 18px;
+  --text-figure: 20px;
+  --text-2xl: 22px;
+  --leading-normal: 1.5;
+  --leading-quote: 1.55;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* motion */
+  --duration-fast: 0.15s;
+  --duration-drawer: 0.22s;
+  --duration-progress: 1.4s;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0e1413;
+    --color-panel: #131a19;
+    --color-surface: #182120;
+    --color-hover: #1f2a29;
+    --color-line: rgb(255 255 255 / 11%);
+    --color-line-strong: rgb(255 255 255 / 26%);
+    --color-text: #e8eeec;
+    --color-text-muted: #aebbb7;
+    --color-text-faint: #92a09c;
+    --color-accent: #5dcaa5;
+    --color-accent-hover: #7bd8b9;
+    --color-on-accent: #04342c;
+    --color-accent-tint: #0f3b32;
+    --color-accent-text: #a6e6cf;
+    --color-warn: #e0a83a;
+    --color-warn-tint: #3a2d0e;
+    --color-warn-text: #f1cf85;
+    --color-bad: #f09595;
+    --color-bad-tint: #3d1b1b;
+    --color-bad-text: #f6bcbc;
+  }
+}

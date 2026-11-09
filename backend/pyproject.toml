@@ -1,0 +1,97 @@
+[build-system]
+requires = ["setuptools~=75.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "report-analyst"
+version = "0.1.0"
+description = "Answers questions about annual reports with verbatim, page-cited evidence."
+requires-python = ">=3.14"
+dependencies = [
+    "anthropic~=2.4",
+    "fastapi~=0.162.0",
+    "fastembed~=0.9.1",  # bge-small embeddings on ONNX, no PyTorch
+    "instructor~=1.17",
+    "mistralai~=3.7",  # Mistral OCR, the PDF text extraction
+    "numpy~=2.5",
+    "pillow~=13.0",
+    "pydantic-settings~=2.16",
+    "pypdfium2~=5.15",  # page counts and page images
+    "python-multipart~=0.0.32",
+    "uvicorn[standard]~=0.54.0",
+    ###################################################################
+    ### Version pins to address security vulnerabilities: ###
+    ###################################################################
+    "certifi>=2026.10.19",  # solves GHSA-6q48-6c7w-9gw2
+]
+
+[dependency-groups]
+dev = [
+    "httpx2~=2.16",  # FastAPI's TestClient
+    "mypy~=1.18",
+    "pymupdf~=2.1",
+    "pytest~=9.1",
+    "ruff~=0.17.1",
+]
+
+[tool.uv]
+# fastembed needs onnxruntime, which has no wheels for Intel Macs.
+environments = [
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux'",
+    "sys_platform == 'win32'",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "FAST", "D", "I", "N", "RUF", "missing-type-function-argument", "missing-return-type-undocumented-public-function"]
+ignore = [
+    "undocumented-param",
+    "docstring-tab-indentation",
+    "undocumented-public-module",
+    "undocumented-public-package",
+    "property-docstring-starts-with-verb",
+    "non-empty-init-module",
+]
+exclude = [
+    "**/tests/**",
+]
+preview = true
+
+[tool.ruff.lint.isort]
+section-order = ["future", "third-party", "first-party", "local-folder"]
+no-lines-before = ["third-party", "local-folder"]
+from-first = false
+known-first-party = ["report_analyst"]
+extra-standard-library = ["pytest"]
+lines-after-imports = 2
+lines-between-types = 1
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+skip-magic-trailing-comma = false
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["pypdfium2"]  # ships no type hints
+ignore_missing_imports = true

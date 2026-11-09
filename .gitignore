@@ -1,0 +1,31 @@
+# Secrets: copy .env.example to .env
+.env
+
+# Python
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+build/
+*.egg-info/
+
+# Runtime data written by the app: reports (PDFs, text, search index)
+backend/data/
+
+# Local tool settings
+.claude/settings.local.json
+.impeccable/hook.cache.json
+.DS_Store
+
+# FE (Front-End)
+frontend/node_modules/
+dist/
+*.tsbuildinfo
+
+# Embedding model: download it once, see README
+models/
+
+# Sample reports: only the small test one is tracked
+samples/*
+!samples/test-report.pdf

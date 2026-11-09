@@ -1,0 +1,21 @@
+# docker compose up --build  →  http://localhost:8080 (API docs: http://localhost:8000/docs)
+services:
+  backend:
+    build:
+      context: ./backend
+      additional_contexts:
+        models: ./models  # COPY --from=models in backend/Dockerfile
+    env_file:
+      - path: .env  # ANTHROPIC_API_KEY, MISTRAL_API_KEY and optional overrides, see .env.example
+        required: false
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data  # reports (PDFs, text, search index)
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend  # nginx resolves the `backend` hostname when it starts
