@@ -14,7 +14,8 @@ from report_analyst.domain import Report, ReportStatus
 from report_analyst.llm import AnthropicLLM
 
 
-# Questions and answers: the answer needs what was said, not only what was asked.
+# Questions and their answers: the answer needs what was said, not only what was asked. The
+# filtering-fields prompt has its own count, with the questions only.
 _EARLIER_TURNS_IN_PROMPT = 3
 
 _ANSWER_PROMPT = """\

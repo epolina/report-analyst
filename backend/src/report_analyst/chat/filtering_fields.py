@@ -13,7 +13,9 @@ from report_analyst.domain import Facts, Fte, Report, SustainabilityGoal
 from report_analyst.llm import AnthropicLLM
 
 
-_EARLIER_QUESTIONS_IN_PROMPT = 3  # so a follow-up ("and in 2025?") keeps its Company
+# Questions only: enough for a follow-up ("and in 2025?") to keep its Company. The answer
+# prompt has its own count, with the answers too (answer_generation.py).
+_EARLIER_QUESTIONS_IN_PROMPT = 3
 
 _FILTERING_FIELDS_PROMPT = """\
 These annual reports are stored, one per line as Company, Reporting Year:

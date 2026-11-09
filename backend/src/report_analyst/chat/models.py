@@ -1,4 +1,4 @@
-"""A Conversation: Questions, the reports each searched, and Answers backed by Evidence."""
+"""A Conversation: Questions, the reports each was about, and Answers backed by Evidence."""
 
 from enum import StrEnum
 from pydantic import BaseModel, Field
@@ -23,7 +23,7 @@ class ReportRef(BaseModel):
 
 
 class ChatEvidence(Evidence):
-    """Evidence for an Answer, naming its report, since one Question can search several.
+    """Evidence for an Answer, naming its report, since one Question can be about several.
 
     Attributes:
         report_id: The report the quote is from.

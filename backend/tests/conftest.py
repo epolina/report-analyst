@@ -71,9 +71,9 @@ class FakeLLM:
         self.answers: dict[type[BaseModel], dict[str, Any]] = {}  # by schema, over `answer`
         self.cited = CitedAnswer(text="", citations=[])  # what `cite` returns
         self.prompts: list[str] = []
-        self.documents: list[tuple[str, str | list[str]]] = []  # what the last `cite` was given
+        self.documents: list[tuple[str, str]] = []  # what the last `cite` was given
 
-    def cite(self, prompt: str, documents: list[tuple[str, str | list[str]]]) -> CitedAnswer:
+    def cite(self, prompt: str, documents: list[tuple[str, str]]) -> CitedAnswer:
         self.prompts.append(prompt)
         self.documents = documents
         return self.cited

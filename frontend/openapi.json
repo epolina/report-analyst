@@ -548,7 +548,7 @@
           "reporting_year"
         ],
         "title": "ChatEvidence",
-        "description": "Evidence for an Answer, naming its report, since one Question can search several.\n\nAttributes:\n    report_id: The report the quote is from.\n    company_name: Its Company.\n    reporting_year: Its Reporting Year."
+        "description": "Evidence for an Answer, naming its report, since one Question can be about several.\n\nAttributes:\n    report_id: The report the quote is from.\n    company_name: Its Company.\n    reporting_year: Its Reporting Year."
       },
       "ChatReply": {
         "properties": {

@@ -73,18 +73,44 @@ def test_complete_validates_with_the_context() -> None:
         llm.complete("Which company?", CheckedAnswer, {"companies": {"ASML"}})
 
 
-def test_a_table_is_cited_by_whole_rows() -> None:
-    from anthropic.types.beta import BetaCitationContentBlockLocation
+def test_cite_sends_each_document_and_returns_the_spans_cited() -> None:
+    def reply(request: httpx2.Request) -> httpx2.Response:
+        [document, prompt] = json.loads(request.content)["messages"][0]["content"]
+        assert document["title"] == "Shell 2024, page 93: FTE 88,497"
+        assert document["source"] == {
+            "type": "text",
+            "media_type": "text/plain",
+            "data": "We employed 88,497 FTEs.",
+        }
+        assert prompt == {"type": "text", "text": "How many FTE?"}
+        citation = {
+            "type": "char_location",
+            "cited_text": "We employed 88,497 FTEs.",
+            "document_index": 0,
+            "document_title": document["title"],
+            "start_char_index": 0,
+            "end_char_index": 24,
+        }
+        text = {"type": "text", "text": "Shell had 88,497 FTE.", "citations": [citation]}
+        return httpx2.Response(
+            200,
+            json={
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
+                "model": "claude-opus-5-5",
+                "content": [text],
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 1, "output_tokens": 1},
+            },
+        )
 
-    from report_analyst.llm import _cited_text
-
-    rows = ["Key figures", "| | 2025 |", "| --- | --- |", "| FTE | 23,126 |", "| NIM | 152 |"]
-    citation = BetaCitationContentBlockLocation(
-        type="content_block_location",
-        cited_text="ignored",
-        document_index=0,
-        start_block_index=3,
-        end_block_index=4,
+    cited = _llm(reply).cite(
+        "How many FTE?", [("Shell 2024, page 93: FTE 88,497", "We employed 88,497 FTEs.")]
     )
 
-    assert _cited_text(citation, [("t", rows)]) == "| FTE | 23,126 |"
+    assert cited.text == "Shell had 88,497 FTE."
+    assert [(c.document_index, c.text) for c in cited.citations] == [
+        (0, "We employed 88,497 FTEs.")
+    ]

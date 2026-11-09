@@ -300,7 +300,7 @@ export interface components {
         };
         /**
          * ChatEvidence
-         * @description Evidence for an Answer, naming its report, since one Question can search several.
+         * @description Evidence for an Answer, naming its report, since one Question can be about several.
          *
          *     Attributes:
          *         report_id: The report the quote is from.

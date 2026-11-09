@@ -4,11 +4,7 @@ import anthropic
 import instructor
 import logging
 
-from anthropic.types.beta import (
-    BetaCitationCharLocation,
-    BetaCitationContentBlockLocation,
-    BetaContentBlockParam,
-)
+from anthropic.types.beta import BetaContentBlockParam
 from collections.abc import Sequence
 from instructor.core.exceptions import InstructorRetryException
 from pydantic import BaseModel
@@ -113,7 +109,7 @@ class AnthropicLLM:
                 f"No valid {schema.__name__} after {error.n_attempts} attempts"
             ) from error
 
-    def cite(self, prompt: str, documents: Sequence[tuple[str, str | list[str]]]) -> CitedAnswer:
+    def cite(self, prompt: str, documents: Sequence[tuple[str, str]]) -> CitedAnswer:
         """Ask Claude about documents, getting text back with what it cites from them.
 
         The API copies each cited span from its document, so quotes are verbatim by
@@ -121,9 +117,8 @@ class AnthropicLLM:
 
         Args:
             prompt: The question and instructions, sent after the documents.
-            documents: (title, content) pairs; a citation names one by its index here. Text
-                is cited by sentence; a list of blocks (e.g. table rows) by whole blocks, which
-                come back joined by newlines.
+            documents: (title, text) pairs; a citation names one by its index here. Claude
+                cites the text, not the title.
 
         Returns:
             The answer and its citations.
@@ -134,15 +129,11 @@ class AnthropicLLM:
         content: list[BetaContentBlockParam] = [
             {
                 "type": "document",
-                "source": (
-                    {"type": "text", "media_type": "text/plain", "data": body}
-                    if isinstance(body, str)
-                    else {"type": "content", "content": [{"type": "text", "text": b} for b in body]}
-                ),
+                "source": {"type": "text", "media_type": "text/plain", "data": text},
                 "title": title,
                 "citations": {"enabled": True},
             }
-            for title, body in documents
+            for title, text in documents
         ]
         content.append({"type": "text", "text": prompt})
         try:
@@ -159,27 +150,13 @@ class AnthropicLLM:
         if message.stop_reason == "refusal":
             raise LLMError("The model declined to answer")
         text_blocks = [block for block in message.content if block.type == "text"]
+        citations = []
+        for block in text_blocks:
+            for citation in block.citations or []:
+                if citation.type == "char_location":  # what a plain-text document is cited by
+                    citations.append(
+                        CitedSpan(document_index=citation.document_index, text=citation.cited_text)
+                    )
         return CitedAnswer(
-            text="".join(block.text for block in text_blocks).strip(),
-            citations=[
-                CitedSpan(
-                    document_index=citation.document_index,
-                    text=_cited_text(citation, documents),
-                )
-                for block in text_blocks
-                for citation in block.citations or []
-                if citation.type in ("char_location", "content_block_location")
-            ],
+            text="".join(block.text for block in text_blocks).strip(), citations=citations
         )
-
-
-def _cited_text(
-    citation: BetaCitationCharLocation | BetaCitationContentBlockLocation,
-    documents: Sequence[tuple[str, str | list[str]]],
-) -> str:
-    # Text documents: the API's cited span. Block documents: the blocks themselves, by index,
-    # one per line, so a cited table keeps its rows apart.
-    _, body = documents[citation.document_index]
-    if citation.type == "content_block_location" and isinstance(body, list):
-        return "\n".join(body[citation.start_block_index : citation.end_block_index])
-    return citation.cited_text
