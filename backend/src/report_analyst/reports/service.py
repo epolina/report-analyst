@@ -109,7 +109,7 @@ class ReportService:
         if existing and on_duplicate is None:
             raise SameCompanyYearError(existing)
         replace = existing is not None and on_duplicate is OnDuplicate.REPLACE
-        if replace and existing and existing.processing:
+        if replace and existing and existing.is_processing:
             raise StillProcessingError(existing)
         try:
             pages = page_count(content)
@@ -203,5 +203,5 @@ def fail_interrupted(repository: ReportRepository) -> None:
         repository: Where reports are stored.
     """
     for report in repository.list():
-        if report.processing:
+        if report.is_processing:
             repository.set_status(report.report_id, ReportStatus.FAILED, ReportFailure.INTERRUPTED)

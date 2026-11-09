@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from report_analyst.chat import Scope
 from report_analyst.chat.service import resolve_scope
 from report_analyst.domain import Report, ReportStatus
-from report_analyst.llm import Cited, CitedAnswer, LLMError
+from report_analyst.llm import CitedSpan, CitedAnswer, LLMError
 from conftest import WHOLE_PAGE, FakeLLM, upload
 
 SPEND = "In 2024, we spent $1.2 billion on climate adaptation."
@@ -20,7 +20,7 @@ def ask(client: TestClient, question: str, **body: object) -> dict:
 def answer(*quotes: str) -> CitedAnswer:
     return CitedAnswer(
         text="Shell spent $1.2 billion on climate adaptation in 2024.",
-        citations=[Cited(document=0, text=q) for q in quotes or (SPEND,)],
+        citations=[CitedSpan(document_index=0, text=q) for q in quotes or (SPEND,)],
     )
 
 
@@ -205,7 +205,11 @@ def test_citations_become_evidence_once_and_none_is_not_found() -> None:
     text = "Shell spent $1.2 billion."
 
     cited = CitedAnswer(
-        text=text, citations=[Cited(document=0, text=f" {SPEND} "), Cited(document=0, text=SPEND)]
+        text=text,
+        citations=[
+            CitedSpan(document_index=0, text=f" {SPEND} "),
+            CitedSpan(document_index=0, text=SPEND),
+        ],
     )
     result = _to_answer(cited, found)
     [evidence] = result.evidence  # the same span cited twice is one Evidence
@@ -221,6 +225,9 @@ def test_citations_become_evidence_once_and_none_is_not_found() -> None:
         2024,
     )
 
-    for citations in ([], [Cited(document=0, text="  ")]):  # nothing cited, or only blanks
+    for citations in (
+        [],
+        [CitedSpan(document_index=0, text="  ")],
+    ):  # nothing cited, or only blanks
         result = _to_answer(CitedAnswer(text=text, citations=citations), found)
         assert (result.kind, result.text, result.reason) == ("not_found", text, "not_in_report")

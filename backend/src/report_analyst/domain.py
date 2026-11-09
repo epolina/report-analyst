@@ -10,10 +10,10 @@ from report_analyst.pdf import Block, PageBox
 
 
 # Markdown and HTML in extracted text (bold, table pipes, headings, <sup>, <br>, comments).
-_MARKUP = re.compile(r"<[^>]*>|[*_|#`]")
+_MARKUP_PATTERN = re.compile(r"<[^>]*>|[*_|#`]")
 
 
-def plain(text: str) -> str:
+def strip_markup(text: str) -> str:
     """The text without Markdown and HTML, whitespace collapsed, for search and quote checks.
 
     Args:
@@ -22,7 +22,7 @@ def plain(text: str) -> str:
     Returns:
         The plain text.
     """
-    return " ".join(_MARKUP.sub(" ", text).split())
+    return " ".join(_MARKUP_PATTERN.sub(" ", text).split())
 
 
 class ReportStatus(StrEnum):
@@ -69,7 +69,7 @@ class Report(BaseModel):
     failure: ReportFailure | None = None
 
     @property
-    def processing(self) -> bool:
+    def is_processing(self) -> bool:
         """Whether a background job is extracting its text or Facts."""
         return self.status is ReportStatus.PROCESSING
 
@@ -114,14 +114,14 @@ class Passage(BaseModel):
             The boxes of the paragraphs or tables that contain the quote, ignoring markup; all
             the Passage's boxes if it spans several.
         """
-        quote = plain(quote)
-        holding = [b for b in self.blocks if quote and quote in plain(b.text)]
-        return [b.box for b in holding or self.blocks]
+        quote = strip_markup(quote)
+        blocks_with_quote = [b for b in self.blocks if quote and quote in strip_markup(b.text)]
+        return [b.box for b in blocks_with_quote or self.blocks]
 
     @property
     def search_text(self) -> str:
         """The heading and text without Markdown, as keyword and embedding search read it."""
-        return plain(f"{self.heading}\n{self.text}")
+        return strip_markup(f"{self.heading}\n{self.text}")
 
 
 class Evidence(BaseModel):

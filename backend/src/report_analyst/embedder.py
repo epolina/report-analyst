@@ -38,13 +38,17 @@ class Embedder:
         """
         if not texts:
             return np.empty((0, 0), dtype=np.float32)
-        order = sorted(range(len(texts)), key=lambda i: len(texts[i]))
-        rows = np.stack(
-            list(self._model.passage_embed([texts[i] for i in order], batch_size=_BATCH_SIZE))
+        shortest_first = sorted(range(len(texts)), key=lambda i: len(texts[i]))
+        sorted_vectors = np.stack(
+            list(
+                self._model.passage_embed(
+                    [texts[i] for i in shortest_first], batch_size=_BATCH_SIZE
+                )
+            )
         )
-        vectors = np.empty_like(rows)
-        vectors[order] = rows  # back in the order of `texts`
-        return _unit(vectors)
+        vectors = np.empty_like(sorted_vectors)
+        vectors[shortest_first] = sorted_vectors  # back in the order of `texts`
+        return _to_unit_length(vectors)
 
     def embed_query(self, query: str) -> Vectors:
         """Embed a search query. bge models add their query instruction here.
@@ -55,10 +59,10 @@ class Embedder:
         Returns:
             A single row.
         """
-        return _unit(np.stack(list(self._model.query_embed(query))))
+        return _to_unit_length(np.stack(list(self._model.query_embed(query))))
 
 
-def _unit(vectors: npt.NDArray[np.floating]) -> Vectors:
+def _to_unit_length(vectors: npt.NDArray[np.floating]) -> Vectors:
     norms = np.linalg.norm(vectors, axis=1, keepdims=True)
     unit: Vectors = (vectors / np.maximum(norms, 1e-12)).astype(np.float32)
     return unit

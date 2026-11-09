@@ -26,7 +26,7 @@ def test_hybrid_index_finds_by_keyword_or_meaning() -> None:
     vectors = np.eye(3, dtype=np.float32)  # each text points its own way
     index = HybridIndex(["net zero by 2040", "revenue grew", "water use fell"], vectors)
 
-    assert index.search("net zero", vectors[2], k=2) == [0, 2]  # keyword first, then meaning
+    assert index.search("net zero", vectors[2], limit=2) == [0, 2]  # keyword first, then meaning
 
 
 def test_splitter_keeps_pages_apart_and_carries_headings() -> None:

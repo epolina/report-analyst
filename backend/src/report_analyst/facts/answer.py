@@ -11,7 +11,7 @@ import logging
 from pydantic import BaseModel, Field, ValidationInfo, model_validator
 from typing import Self
 
-from report_analyst.domain import Evidence, Facts, Fte, Passage, SustainabilityGoal, plain
+from report_analyst.domain import Evidence, Facts, Fte, Passage, SustainabilityGoal, strip_markup
 
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class Citation(BaseModel):
             The Evidence, or None if the quote isn't in the Passage, ignoring markup.
         """
         passage = passages[self.passage_id]
-        if not (quote := plain(self.quote)) or quote not in plain(passage.text):
+        if not (quote := strip_markup(self.quote)) or quote not in strip_markup(passage.text):
             logger.warning(
                 "Dropped a citation: quote not in passage %d: %r", passage.index, self.quote
             )

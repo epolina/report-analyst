@@ -21,15 +21,15 @@ class LLMError(Exception):
     """The model gave no valid output after the retries, or the API call failed."""
 
 
-class Cited(BaseModel):
+class CitedSpan(BaseModel):
     """A span Claude cited: which document, and its text, copied exactly by the API.
 
     Attributes:
-        document: The document's index in the list given.
+        document_index: The document's index in the list given.
         text: The cited text, verbatim from that document.
     """
 
-    document: int
+    document_index: int
     text: str
 
 
@@ -42,7 +42,7 @@ class CitedAnswer(BaseModel):
     """
 
     text: str
-    citations: list[Cited]
+    citations: list[CitedSpan]
 
 
 _MAX_TOKENS = 16_000  # the output limit per call
@@ -66,9 +66,9 @@ class AnthropicLLM:
             client: The Anthropic client. The adapter wraps it with Instructor.
             model: The Claude model ID.
         """
-        self._anthropic = client
+        self._anthropic_client = client
         # beta=True: the refusal fallback below is a beta parameter.
-        self._client = instructor.from_anthropic(client, beta=True)
+        self._instructor_client = instructor.from_anthropic(client, beta=True)
         self._model = model
 
     def complete[T: BaseModel](
@@ -88,7 +88,7 @@ class AnthropicLLM:
             LLMError: If no valid answer came back after the retries, or the API call failed.
         """
         try:
-            return self._client.create(
+            return self._instructor_client.create(
                 response_model=schema,
                 messages=[{"role": "user", "content": prompt}],
                 # Instructor's max_retries counts the retries after the first try.
@@ -145,7 +145,7 @@ class AnthropicLLM:
         ]
         content.append({"type": "text", "text": prompt})
         try:
-            message = self._anthropic.beta.messages.create(
+            message = self._anthropic_client.beta.messages.create(
                 model=self._model,
                 max_tokens=_MAX_TOKENS,
                 messages=[{"role": "user", "content": content}],
@@ -157,14 +157,17 @@ class AnthropicLLM:
             raise LLMError(f"The model call failed: {error.message}") from error
         if message.stop_reason == "refusal":
             raise LLMError("The model declined to answer")
-        texts = [b for b in message.content if b.type == "text"]
+        text_blocks = [block for block in message.content if block.type == "text"]
         return CitedAnswer(
-            text="".join(b.text for b in texts).strip(),
+            text="".join(block.text for block in text_blocks).strip(),
             citations=[
-                Cited(document=c.document_index, text=_cited_text(c, documents))
-                for b in texts
-                for c in b.citations or []
-                if c.type in ("char_location", "content_block_location")
+                CitedSpan(
+                    document_index=citation.document_index,
+                    text=_cited_text(citation, documents),
+                )
+                for block in text_blocks
+                for citation in block.citations or []
+                if citation.type in ("char_location", "content_block_location")
             ],
         )
 

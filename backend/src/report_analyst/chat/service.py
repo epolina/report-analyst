@@ -207,11 +207,11 @@ def _to_answer(cited_answer: CitedAnswer, found_passages: _ReportPassages) -> An
     # backs the text: Not Found, whatever it says.
     evidence_by_quote: dict[tuple[int, str], ChatEvidence] = {}
     for citation in cited_answer.citations:
-        report, passage = found_passages[citation.document]
+        report, passage = found_passages[citation.document_index]
         quote = citation.text.strip()
         # Claude may cite a span twice
-        if quote and (citation.document, quote) not in evidence_by_quote:
-            evidence_by_quote[citation.document, quote] = ChatEvidence(
+        if quote and (citation.document_index, quote) not in evidence_by_quote:
+            evidence_by_quote[citation.document_index, quote] = ChatEvidence(
                 page=passage.page,
                 quote=quote,
                 boxes=passage.boxes_of(quote),
