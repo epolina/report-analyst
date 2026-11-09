@@ -457,7 +457,7 @@ export interface components {
          * @description Why a Question has no Answer.
          * @enum {string}
          */
-        NotFoundReason: "not_in_report" | "report_not_ready" | "no_report" | "no_matching_report" | "unsupported_topic";
+        NotFoundReason: "not_in_report" | "report_not_ready" | "no_report" | "no_company_named" | "no_matching_report" | "unsupported_topic";
         /**
          * OnDuplicate
          * @description What the user chose for an upload with the Company and year of a stored report.

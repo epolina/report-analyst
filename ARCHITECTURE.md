@@ -8,7 +8,7 @@ Four layers, with the domain objects (see UBIQUITOUS_LANGUAGE.md) at the centre:
 
 1. **Domain** (`domain.py`): Report, Passage, Evidence, Facts. Pydantic models plus their rules (e.g. `plain`, `Passage.search_text`). They import nothing from the app except `pdf.Block` and `pdf.PageBox`, the text a Passage is made of and the shape of a highlight.
 2. **Generic tools** (`pdf/`, `search/`, `llm.py`, `storage.py`): each wraps one library or job. `pdf/` holds `models.py` (Block, PageBox, ExtractionError), `mistral_extractor.py` (the `PdfExtractor` interface and Mistral OCR) and `rasterizer.py` (page count and page images, with pdfium). `search/` holds `embedder.py` (the embedding model) and `index.py` (BM25 and the hybrid index). `storage.py` writes a file atomically. They know nothing about reports and import nothing from the app except `search.Vectors`.
-3. **Use cases** (`reports/`, `facts/`, `chat/`): `ReportService` adds and processes a report; `Retriever` embeds and searches its Passages. `FactExtractor` reads Facts out of a report and stores nothing. `ChatService` matches a Question to the stored reports, answers it from their Facts and stores the Conversation.
+3. **Use cases** (`reports/`, `facts/`, `chat/`): `ReportService` adds and processes a report; `Retriever` embeds and searches its Passages. `FactExtractor` reads Facts out of a report and stores nothing. `ChatService` extracts what a Question asks about, finds the matching reports' Facts, answers from them and stores the Conversation.
 4. **HTTP** (`routers/`): parse input, call `ReportService` or `ChatService`, map their errors to a status and an `ErrorCode`; the UI words the code. A route that only reads what upload stored, with no logic on top, reads `ReportRepository` directly.
 
 Imports point one way: `routers → chat → reports → facts → domain + generic tools`.
@@ -49,8 +49,8 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
 │       │   ├── extractor.py    # FactExtractor: topic searches, then one Claude call
 │       │   └── model_output.py # the Facts as Claude writes them; checks each quote in its Passage
 │       ├── chat/
-│       │   ├── service.py      # ChatService: match, then answer from the Facts with citations
-│       │   ├── matching.py     # ReportMatch: Claude picks the reports and the topic, ids checked
+│       │   ├── service.py      # ChatService: extract fields, find relevant Facts, generate the answer
+│       │   ├── filtering_fields.py  # FilteringFields: the Fact and the Company-year pairs asked about
 │       │   ├── repository.py   # ConversationRepository: one JSON file each
 │       │   └── models.py       # ReportRef, Answer, Turn, Conversation, ChatReply
 │       └── routers/
@@ -83,12 +83,13 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
 
 ## Chat
 
-Chat answers only what processing extracted, the FTE and the Sustainability Goals, in two Claude calls:
+Chat answers only what processing extracted, the FTE and the Sustainability Goals. `ChatService._answer` has three steps, and a step that can't go on raises `QuestionNotAnsweredError`, which `ask` stores as a Not Found with its reason:
 
-1. **Match** (`matching.py`, structured output through Instructor). Claude gets the Question, the last three Questions and the list of stored reports, and returns a `ReportMatch`: the ids of the reports meant (short names and spellings included, "ABN" is "ABN AMRO"; a Company without a year is its latest report; no Company named means all), what the Question names that isn't stored (`missing`), and the topic (`fte`, `sustainability_goals` or `other`). An id that isn't stored fails validation and goes back to Claude, like the facts' passage ids. Anything in `missing` is a Not Found that names it (`no_matching_report`); topic `other` is `unsupported_topic`; reports still processing or failed are `report_not_ready`. None of these makes the second call.
-2. **Answer** (citations). Each Fact on the topic, from each matched report, is one document: the title names the report, page and fact ("ABN AMRO 2025, page 57: goal: Net zero, deadline 2050") and the content is the Fact's verbatim quote. The prompt lists the reports asked about with what was extracted from each, so Claude can say which has nothing on the topic, and asks for one short part per report when there are several. A cited Fact becomes Evidence with its own page and boxes, as in the report view. An answer citing nothing is Not Found, whatever its text says.
+1. **Extract the filtering fields** (`filtering_fields.py`, structured output through Instructor). Claude gets the Question, the last three Questions and the stored reports (Company and year), and returns `FilteringFields`: the `fact` asked about (`fte`, `sustainability_goals`, or null for anything else) and the `company_year_pairs`. Since it sees the stored reports, it writes their Companies as stored ("ABN" is "ABN AMRO"); a Company without a year is its latest report; a follow-up keeps the earlier Company. No fact is `unsupported_topic`; no pair is `no_company_named`.
+2. **Find the relevant Facts** (in code, no model). Each pair is matched to the stored reports by Company (ignoring case) and year. A pair with no report is `no_matching_report`, naming it in `missing`; reports all still processing or failed are `report_not_ready`. The Facts of the kind asked about, from the ready reports, are the relevant Facts; none is `not_in_report`.
+3. **Generate the answer** (citations). Each relevant Fact is one document: the title names the report, page and fact ("ABN AMRO 2025, page 57: goal: Net zero, deadline 2050") and the content is its verbatim quote. The prompt lists the reports asked about with what was found in each, and asks for one short part per report when there are several. A cited Fact becomes Evidence with its own page and boxes, as in the report view. An answer citing nothing is `not_in_report`, whatever its text says.
 
-The UI shows the reports a Question was matched to under it. There are no Company or year selects: the Question, or the earlier ones for a follow-up, says which reports. Not Found is an Answer with a reason (`not_in_report`, `report_not_ready`, `no_report`, `no_matching_report`, `unsupported_topic`) that the UI words. Conversations are JSON files, so they survive a restart; the browser keeps the open one's id to show it again. Files stored before report matching still load: the old `scope` is ignored and `reports` defaults to empty.
+The UI shows the reports a Question was matched to under it. There are no Company or year selects: the Question, or the earlier ones for a follow-up, says which reports. The UI words every reason. Conversations are JSON files, so they survive a restart; the browser keeps the open one's id to show it again. Files stored before this still load: the old `scope` is ignored and `reports` defaults to empty.
 
 ## File roles
 

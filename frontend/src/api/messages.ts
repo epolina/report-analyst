@@ -41,6 +41,10 @@ export const NOT_FOUND_MESSAGES: Record<
   not_in_report: () => ({ title: "Not in the extracted facts" }),
   report_not_ready: () => ({ title: "Report not ready", note: "Ask again once the report is Ready." }),
   no_report: () => ({ title: "No report yet", note: "Add a report PDF first." }),
+  no_company_named: () => ({
+    title: "Which report?",
+    note: "Couldn't tell which Company you mean. Ask again with its name, and the year if it has several reports.",
+  }),
   no_matching_report: (missing) => ({
     title: "No matching report",
     note: missing.length

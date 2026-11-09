@@ -756,6 +756,7 @@
           "not_in_report",
           "report_not_ready",
           "no_report",
+          "no_company_named",
           "no_matching_report",
           "unsupported_topic"
         ],

@@ -64,8 +64,9 @@
 // POST /chat
 { "conversation_id": null,                           // null starts a new one
   "question": "Compare the sustainability goals of ABN 2025 and Shell 2025" }
-// Claude matches the question (and earlier ones, for a follow-up) to the stored reports, then
-// answers from their extracted Facts. Only the FTE and Sustainability Goals are supported.
+// Claude reads the Fact and the Company-year pairs from the question (and earlier ones, for a
+// follow-up); the app finds those reports' extracted Facts; Claude answers from them.
+// Only the FTE and Sustainability Goals are supported.
 // → 200 ChatReply
 { "conversation_id": "<uuid>",
   "question": "...",
@@ -81,6 +82,7 @@
   "reason": "not_in_report"         // the Facts don't state it, or the answer cited none
           | "report_not_ready"      // the reports asked about are processing or failed
           | "no_report"             // nothing is stored yet
+          | "no_company_named"      // couldn't tell which Company the question means
           | "no_matching_report"    // a Company or year with no stored report: see missing
           | "unsupported_topic",    // not about the FTE or Sustainability Goals
   "missing": ["ABN AMRO 2023"] }    // for no_matching_report; [] otherwise

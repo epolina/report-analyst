@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from report_analyst.chat.matching import ReportMatch
+from report_analyst.chat.filtering_fields import FilteringFields
 from report_analyst.llm import CitedAnswer, CitedSpan, LLMError
 from report_analyst.settings import AppSettings
 from conftest import WHOLE_PAGE, FakeLLM, HeldJobs, upload
@@ -47,15 +47,19 @@ def add_report(
     return str(upload(client, pdf, **form).json()["report_id"])
 
 
-def match(fake_llm: FakeLLM, *report_ids: str, topic: str = "fte", **more: Any) -> None:
-    fake_llm.answers[ReportMatch] = {"report_ids": list(report_ids), "topic": topic, **more}
+def filtering_fields(fake_llm: FakeLLM, fact: str | None, *pairs: tuple[str, int]) -> None:
+    """Make Claude read `fact` and these Company and year pairs out of the next Question."""
+    fake_llm.answers[FilteringFields] = {
+        "fact": fact,
+        "company_year_pairs": [{"company_name": c, "reporting_year": y} for c, y in pairs],
+    }
 
 
 def test_an_fte_question_is_answered_from_the_extracted_facts(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
     shell = add_report(client, make_pdf, fake_llm)
-    match(fake_llm, shell)
+    filtering_fields(fake_llm, "fte", ("shell", 2024))  # matched ignoring case
     fake_llm.cited = CitedAnswer(
         text="Shell had 12,345 FTE in 2024.",
         citations=[
@@ -66,10 +70,10 @@ def test_an_fte_question_is_answered_from_the_extracted_facts(
 
     reply = ask(client, "How many FTE did shell have?")
 
-    match_prompt, answer_prompt = fake_llm.prompts[-2:]
-    assert f"{shell}: Shell, 2024" in match_prompt
-    assert "Question: How many FTE did shell have?" in match_prompt
-    assert "- Shell 2024: FTE extracted" in answer_prompt
+    filtering_fields_prompt, answer_prompt = fake_llm.prompts[-2:]
+    assert "Shell, 2024" in filtering_fields_prompt  # the stored reports
+    assert "Question: How many FTE did shell have?" in filtering_fields_prompt
+    assert "- Shell 2024: FTE found" in answer_prompt
     assert "at most three sentences" in answer_prompt
     assert fake_llm.documents == [("Shell 2024, page 1: FTE 12,345", FTE_SENTENCE)]
     assert reply["reports"] == [
@@ -93,7 +97,7 @@ def test_goals_of_two_reports_are_compared(
 ) -> None:
     abn = add_report(client, make_pdf, fake_llm, "ABN AMRO", "2025")
     shell = add_report(client, make_pdf, fake_llm, "Shell", "2025", goal=None)
-    match(fake_llm, abn, shell, topic="sustainability_goals")
+    filtering_fields(fake_llm, "sustainability_goals", ("ABN AMRO", 2025), ("Shell", 2025))
     fake_llm.cited = CitedAnswer(
         text="ABN AMRO aims for net zero by 2050; Shell 2025 lists no goals.",
         citations=[CitedSpan(document_index=0, text=GOAL_SENTENCE)],
@@ -102,13 +106,13 @@ def test_goals_of_two_reports_are_compared(
     reply = ask(client, "Compare the sustainability goals of ABN 2025 and Shell 2025")
 
     answer_prompt = fake_llm.prompts[-1]
-    assert "- ABN AMRO 2025: 1 sustainability goals extracted" in answer_prompt
-    assert "- Shell 2025: 0 sustainability goals extracted" in answer_prompt
+    assert "- ABN AMRO 2025: 1 sustainability goal found" in answer_prompt
+    assert "- Shell 2025: 0 sustainability goals found" in answer_prompt
     assert "a short paragraph for each report" in answer_prompt
     assert fake_llm.documents == [
         ("ABN AMRO 2025, page 1: goal: Net zero, deadline 2050", GOAL_SENTENCE)
     ]
-    assert [r["company_name"] for r in reply["reports"]] == ["ABN AMRO", "Shell"]
+    assert [r["report_id"] for r in reply["reports"]] == [abn, shell]
     [evidence] = reply["answer"]["evidence"]
     assert (evidence["company_name"], evidence["quote"]) == ("ABN AMRO", GOAL_SENTENCE)
 
@@ -117,7 +121,7 @@ def test_a_company_or_year_not_stored_is_named_without_answering(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
     shell = add_report(client, make_pdf, fake_llm)
-    match(fake_llm, shell, missing=["ABN AMRO 2023"])
+    filtering_fields(fake_llm, "fte", ("Shell", 2024), ("ABN AMRO", 2023))
     calls = len(fake_llm.prompts)
 
     reply = ask(client, "Compare the FTE of Shell 2024 and ABN AMRO 2023")
@@ -129,39 +133,39 @@ def test_a_company_or_year_not_stored_is_named_without_answering(
         "reason": "no_matching_report",
         "missing": ["ABN AMRO 2023"],
     }
-    assert len(fake_llm.prompts) == calls + 1  # matched, not answered
+    assert reply["reports"][0]["report_id"] == shell  # the pair that is stored
+    assert len(fake_llm.prompts) == calls + 1  # fields extracted, no answer generated
 
 
 def test_a_question_about_anything_else_is_not_supported(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
-    shell = add_report(client, make_pdf, fake_llm)
-    match(fake_llm, shell, topic="other")
+    add_report(client, make_pdf, fake_llm)
+    filtering_fields(fake_llm, None, ("Shell", 2024))
     calls = len(fake_llm.prompts)
 
     reply = ask(client, "What was Shell's revenue in 2024?")
 
     assert reply["answer"]["reason"] == "unsupported_topic"
-    assert reply["reports"][0]["report_id"] == shell
     assert len(fake_llm.prompts) == calls + 1
 
 
-def test_a_report_id_the_model_made_up_fails_the_question(
+def test_a_question_naming_no_company_asks_for_one(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
     add_report(client, make_pdf, fake_llm)
-    match(fake_llm, "00000000-0000-0000-0000-000000000000")
+    filtering_fields(fake_llm, "fte")
 
-    response = client.post("/chat", json={"question": "How many FTE?"})
+    reply = ask(client, "How many FTE?")
 
-    assert (response.status_code, response.json()) == (502, {"code": "answer_failed"})
+    assert (reply["answer"]["reason"], reply["reports"]) == ("no_company_named", [])
 
 
 def test_a_report_still_processing_has_no_facts_yet(
     client: TestClient, held_jobs: HeldJobs, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
-    shell = upload(client, make_pdf(FTE_SENTENCE)).json()["report_id"]
-    match(fake_llm, shell)
+    upload(client, make_pdf(FTE_SENTENCE))
+    filtering_fields(fake_llm, "fte", ("Shell", 2024))
 
     reply = ask(client, "How many FTE did Shell have?")
 
@@ -171,8 +175,8 @@ def test_a_report_still_processing_has_no_facts_yet(
 def test_no_fact_on_the_topic_is_not_found_without_answering(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
-    shell = add_report(client, make_pdf, fake_llm, fte=False)
-    match(fake_llm, shell)
+    add_report(client, make_pdf, fake_llm, fte=False)
+    filtering_fields(fake_llm, "fte", ("Shell", 2024))
     calls = len(fake_llm.prompts)
 
     reply = ask(client, "How many FTE did Shell have?")
@@ -194,7 +198,7 @@ def test_an_answer_citing_nothing_is_not_found(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
     shell = add_report(client, make_pdf, fake_llm)
-    match(fake_llm, shell)
+    filtering_fields(fake_llm, "fte", ("Shell", 2024))
     fake_llm.cited = CitedAnswer(text="The facts don't give it.", citations=[])
 
     reply = ask(client, "How many FTE did Shell have?")
@@ -210,7 +214,7 @@ def test_follow_ups_see_earlier_turns_and_the_conversation_is_stored(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
     shell = add_report(client, make_pdf, fake_llm)
-    match(fake_llm, shell)
+    filtering_fields(fake_llm, "fte", ("Shell", 2024))
     fake_llm.cited = CitedAnswer(
         text="12,345 FTE.", citations=[CitedSpan(document_index=0, text=FTE_SENTENCE)]
     )
@@ -233,7 +237,7 @@ def test_model_failure_is_502_and_stores_nothing(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
     shell = add_report(client, make_pdf, fake_llm)
-    match(fake_llm, shell)
+    filtering_fields(fake_llm, "fte", ("Shell", 2024))
 
     def fail(prompt: str, documents: object) -> CitedAnswer:
         raise LLMError("down")

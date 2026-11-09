@@ -45,6 +45,8 @@ class NotFoundReason(StrEnum):
     """The reports asked about are still processing or failed."""
     NO_REPORT = "no_report"
     """No report is stored yet."""
+    NO_COMPANY_NAMED = "no_company_named"
+    """The Question, and the earlier ones, name no Company to look up."""
     NO_MATCHING_REPORT = "no_matching_report"
     """The Question names a Company or year that no stored report has; see `missing`."""
     UNSUPPORTED_TOPIC = "unsupported_topic"
