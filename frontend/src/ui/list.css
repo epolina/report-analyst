@@ -1,7 +1,7 @@
-/* The Reports list: top-bar tab, drawer pane, add button, status dots, skeleton, filters, table. */
+/* The Reports list: top-bar button, drawer pane, add-file button, status dots, skeleton, filters, table. */
 
-/* ---------- top-bar tab ---------- */
-.ui-tab {
+/* ---------- top-bar button ---------- */
+.ui-top-bar-button {
   display: inline-flex;
   align-items: center;
   height: var(--control-height);
@@ -13,27 +13,27 @@
   cursor: pointer;
 }
 
-.ui-tab:disabled {
+.ui-top-bar-button:disabled {
   cursor: default;
   opacity: 0.6;
 }
 
-.ui-tab:hover:not(:disabled) {
+.ui-top-bar-button:hover:not(:disabled) {
   background: var(--color-hover);
 }
 
-.ui-tab[aria-pressed="true"] {
+.ui-top-bar-button[aria-pressed="true"] {
   background: var(--color-accent-tint);
   color: var(--color-accent-text);
 }
 
-.ui-tab-count {
+.ui-top-bar-button-count {
   margin-left: var(--space-3);
   color: var(--color-text-faint);
   font-size: var(--text-xs);
 }
 
-.ui-tab[aria-pressed="true"] .ui-tab-count {
+.ui-top-bar-button[aria-pressed="true"] .ui-top-bar-button-count {
   color: var(--color-accent-text);
 }
 
@@ -53,7 +53,7 @@
   font-weight: var(--weight-semibold);
 }
 
-.ui-drop {
+.ui-add-file-button {
   display: flex;
   flex: none;
   align-items: center;
@@ -68,12 +68,12 @@
   cursor: pointer;
 }
 
-.ui-drop:disabled {
+.ui-add-file-button:disabled {
   cursor: default;
   opacity: 0.6;
 }
 
-.ui-drop:hover:not(:disabled) {
+.ui-add-file-button:hover:not(:disabled) {
   background: var(--color-hover);
   color: var(--color-text);
 }
@@ -117,7 +117,7 @@
   }
 }
 
-.ui-tab .ui-dot {
+.ui-top-bar-button .ui-dot {
   margin-left: var(--space-2);
 }
 

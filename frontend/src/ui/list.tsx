@@ -15,9 +15,9 @@ type TopBarButtonProps = Omit<ComponentProps<"button">, "className" | "type"> & 
 // `dot` flags something worth a look inside, e.g. a failed report.
 export function TopBarButton({ pressed, count, dot, children, ...props }: TopBarButtonProps) {
   return (
-    <button className="ui-tab" type="button" aria-pressed={pressed} {...props}>
+    <button className="ui-top-bar-button" type="button" aria-pressed={pressed} {...props}>
       {children}
-      {count !== undefined && <span className="ui-tab-count">{count}</span>}
+      {count !== undefined && <span className="ui-top-bar-button-count">{count}</span>}
       {dot && <span className="ui-dot" data-tone={dot.tone} role="img" aria-label={dot.label} title={dot.label} />}
     </button>
   );
@@ -82,7 +82,7 @@ export function AddFileButton({
   onClick: () => void;
 }) {
   return (
-    <button className="ui-drop" type="button" disabled={disabled} onClick={onClick}>
+    <button className="ui-add-file-button" type="button" disabled={disabled} onClick={onClick}>
       {ICONS.upload}
       <span>{children}</span>
     </button>
