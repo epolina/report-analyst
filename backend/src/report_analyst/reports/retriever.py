@@ -3,9 +3,8 @@
 from uuid import UUID
 
 from report_analyst.domain import Passage
-from report_analyst.embedder import Embedder, Vectors
-from report_analyst.index import HybridIndex
 from report_analyst.reports.repository import ReportRepository
+from report_analyst.search import Embedder, HybridIndex, Vectors
 
 
 # Indexes stay in memory between requests, keyed by report and when its Passages were saved, so

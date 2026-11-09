@@ -10,7 +10,7 @@ from pydantic import TypeAdapter
 from uuid import UUID, uuid4
 
 from report_analyst.domain import Facts, Passage, Report, ReportFailure, ReportStatus
-from report_analyst.embedder import Vectors
+from report_analyst.search import Vectors
 from report_analyst.storage import write_atomic
 
 

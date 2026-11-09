@@ -7,7 +7,7 @@ RAG system for analysing annual reports. Python backend, web frontend, runs loca
 Four layers, with the domain objects (see UBIQUITOUS_LANGUAGE.md) at the centre:
 
 1. **Domain** (`domain.py`): Report, Passage, Evidence, Facts. Pydantic models plus their rules (e.g. `plain`, `Passage.search_text`). They import nothing from the app except `pdf.Block` and `pdf.PageBox`, the text a Passage is made of and the shape of a highlight.
-2. **Generic tools** (`pdf/`, `index.py`, `embedder.py`, `llm.py`, `storage.py`): each wraps one library or job. `pdf/` holds `models.py` (Block, PageBox, ExtractionError), `mistral_extractor.py` (the `PdfExtractor` interface and Mistral OCR) and `rasterizer.py` (page count and page images, with pdfium). `storage.py` writes a file atomically. They know nothing about reports and import nothing from the app except `embedder.Vectors`.
+2. **Generic tools** (`pdf/`, `search/`, `llm.py`, `storage.py`): each wraps one library or job. `pdf/` holds `models.py` (Block, PageBox, ExtractionError), `mistral_extractor.py` (the `PdfExtractor` interface and Mistral OCR) and `rasterizer.py` (page count and page images, with pdfium). `search/` holds `embedder.py` (the embedding model) and `index.py` (BM25 and the hybrid index). `storage.py` writes a file atomically. They know nothing about reports and import nothing from the app except `search.Vectors`.
 3. **Use cases** (`reports/`, `facts/`, `chat/`): `ReportService` adds and processes a report; `Retriever` embeds and searches its Passages. `FactExtractor` reads Facts out of a report and stores nothing. `ChatService` answers a Question from the reports in scope and stores the Conversation.
 4. **HTTP** (`routers/`): parse input, call `ReportService` or `ChatService`, map their errors to a status and an `ErrorCode`; the UI words the code. A route that only reads what upload stored, with no logic on top, reads `ReportRepository` directly.
 
@@ -30,10 +30,11 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
 │       ├── main.py             # the FastAPI app, routers, logging; start-up fails interrupted jobs
 │       ├── settings.py         # AppSettings from environment variables
 │       ├── domain.py           # Report, Passage, Evidence, Fte, SustainabilityGoal, Facts
-│       ├── embedder.py         # Embedder: bge-small via fastembed (ONNX), passages and queries
-│       ├── index.py            # BM25 + HybridIndex: keyword and embedding search, fused by rank
 │       ├── llm.py              # AnthropicLLM: structured output (Instructor) or cited text
 │       ├── storage.py          # write_atomic: write to a temporary file, then rename
+│       ├── search/
+│       │   ├── embedder.py     # Embedder: bge-small via fastembed (ONNX), passages and queries
+│       │   └── index.py        # BM25 + HybridIndex: keyword and embedding search, fused by rank
 │       ├── pdf/
 │       │   ├── models.py       # Block (heading/text/table, with its PageBox), ExtractionError
 │       │   ├── mistral_extractor.py  # PdfExtractor interface; MistralExtractor (Mistral OCR API)

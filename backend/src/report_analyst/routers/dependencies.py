@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Annotated
 
 from report_analyst.chat import ChatService, ConversationRepository
-from report_analyst.embedder import Embedder
 from report_analyst.facts import FactExtractor
 from report_analyst.llm import AnthropicLLM
 from report_analyst.pdf import MistralExtractor, PdfExtractor
 from report_analyst.reports import ReportRepository, ReportService, Retriever
+from report_analyst.search import Embedder
 from report_analyst.settings import AppSettings
 
 

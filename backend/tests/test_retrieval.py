@@ -5,7 +5,7 @@ from uuid import UUID
 import numpy as np
 from fastapi.testclient import TestClient
 
-from report_analyst.index import BM25, HybridIndex, tokenize
+from report_analyst.search import BM25, HybridIndex, tokenize
 from report_analyst.pdf import Block, BlockKind, PageBox
 from report_analyst.reports import ReportRepository, Retriever
 from report_analyst.reports.splitting import split_into_passages

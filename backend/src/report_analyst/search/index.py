@@ -7,7 +7,7 @@ import re
 
 from collections import Counter
 
-from report_analyst.embedder import Vectors
+from report_analyst.search.embedder import Vectors
 
 
 _WORD_PATTERN = re.compile(r"\w+")
