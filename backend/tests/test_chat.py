@@ -78,7 +78,6 @@ def test_an_fte_question_is_answered_from_the_extracted_facts(
     assert Fte.description in filtering_fields_prompt  # what the Fact is and how it's asked
     assert Fte.description in answer_prompt
     assert SustainabilityGoal.description in filtering_fields_prompt
-    assert "at most three sentences" in answer_prompt
     assert fake_llm.documents == [("Shell 2024, page 1: FTE 12,345", FTE_SENTENCE)]
     assert reply["reports"] == [
         {"report_id": shell, "company_name": "Shell", "reporting_year": 2024}
@@ -112,7 +111,6 @@ def test_goals_of_two_reports_are_compared(
     answer_prompt = fake_llm.prompts[-1]
     assert "- ABN AMRO 2025: 1 fact found" in answer_prompt
     assert "- Shell 2025: 0 facts found" in answer_prompt
-    assert "a short paragraph for each report" in answer_prompt
     assert fake_llm.documents == [
         ("ABN AMRO 2025, page 1: Sustainability goal: Net zero, deadline 2050", GOAL_SENTENCE)
     ]

@@ -28,17 +28,10 @@ The reports asked about:
 
 {earlier_turns}Question: {question}
 
-{length} Cite the documents that state what you say. If they don't answer the question, say
-so in one sentence and cite nothing: an honest "not found" is better than a guess."""
-
-_LENGTH_FOR_ONE_REPORT = (
-    "Answer in plain text, in at most three sentences, with the figure and its unit if there"
-    " is one."
-)
-_LENGTH_FOR_SEVERAL_REPORTS = (
-    "Answer in plain text: a short paragraph for each report, then one or two sentences"
-    " comparing them. Say so if a report has no facts on this."
-)
+Answer from these documents only, in plain text (no Markdown: it is shown as typed), and cite
+the documents that state what you say. Say so if a report asked about has no facts on this.
+If they don't answer the question, say so in one sentence and cite nothing: an honest "not
+found" is better than a guess."""
 
 
 @dataclass(frozen=True)
@@ -129,7 +122,6 @@ def _build_prompt(
             for turn in history[-_EARLIER_TURNS_IN_PROMPT:]
         ),
         question=question,
-        length=_LENGTH_FOR_ONE_REPORT if len(reports) == 1 else _LENGTH_FOR_SEVERAL_REPORTS,
     )
 
 
