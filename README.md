@@ -12,8 +12,35 @@ Everything runs on your machine except two API calls: Mistral reads the PDF's te
 |---|---|
 | ![A chat answer quoting the report, with the page each quote is on](docs/screenshots/chat-answer.png) | ![A report's facts beside its PDF page, the quote highlighted](docs/screenshots/report-evidence.png) |
 | An answer with its evidence: each quote is verbatim, with its page | A report's facts beside the page they come from, the quote highlighted |
-| ![A question the report doesn't answer, answered "Not Found"](docs/screenshots/chat-not-found.png) | ![The Reports drawer, listing each report's status](docs/screenshots/reports.png) |
-| When the reports don't say, the answer is "Not Found" | The Reports drawer: add a report, see whether it's ready |
+| ![A question about a report that isn't stored, answered "Not Found"](docs/screenshots/chat-not-found.png) | ![The Reports drawer, listing each report's status](docs/screenshots/reports.png) |
+| Asked about a report that isn't stored, the answer is "Not Found" and names it | The Reports drawer: add a report, see whether it's ready |
+
+## How it works
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/how-it-works-dark.png">
+  <img alt="How it works: the analyst uploads a PDF, processing extracts its Facts once, and chat answers each question from those Facts" src="docs/screenshots/how-it-works-light.png">
+</picture>
+
+| Step | What happens | Where |
+|---|---|---|
+| | **Adding a report** (once per report, in the background) | |
+| 1 | The analyst uploads a PDF with its Company and year | Analyst → Frontend |
+| 2 | The backend checks the PDF and stores it | Backend → Files |
+| 3 | Mistral OCR reads the text and where it sits on each page | Mistral OCR |
+| 4 | The backend splits the text into Passages and embeds them for search | Embedding model |
+| 5 | The backend searches for FTE and goal Passages; Claude extracts the Facts with verbatim quotes | Claude |
+| 6 | The backend checks each quote against its page, then saves the Passages, page images and Facts | Files |
+| | **Browsing a report** | |
+| 7 | The analyst opens a ready report and sees its Facts beside the page each one comes from, the quote highlighted | Analyst → Frontend → Backend → Files |
+| | **Asking a question** | |
+| 8 | The analyst asks a question | Analyst → Frontend → Backend |
+| 9 | Claude reads it: which fact, which Company and year | Claude |
+| 10 | The backend finds the matching reports and loads their Facts | Files |
+| 11 | Claude writes the answer, citing the Facts | Claude |
+| 12 | The backend saves the Conversation; the frontend shows the answer with each quote highlighted on its page, or Not Found | Files, Frontend |
+
+Chat never reads the PDF again: it answers only from the Facts saved while processing, so every quote was already checked against its page. [ARCHITECTURE.md](ARCHITECTURE.md) has each step in detail.
 
 ## What you need
 
@@ -24,7 +51,7 @@ Everything runs on your machine except two API calls: Mistral reads the PDF's te
 | `ANTHROPIC_API_KEY` | Extracting the facts and answering questions, with Claude (`claude-opus-5-5` by default) | [console.anthropic.com](https://console.anthropic.com) → API Keys |
 | `MISTRAL_API_KEY` | Reading the PDF's text with Mistral OCR (`mistral-ocr-latest`), including where each paragraph is on the page | [console.mistral.ai](https://console.mistral.ai) → API Keys |
 
-Both are paid APIs. Processing a report makes one OCR call and one Claude call (retried up to twice if its output fails validation); each question makes one Claude call.
+Both are paid APIs. Processing a report makes one OCR call and one Claude call (retried up to twice if its output fails validation); each question makes two Claude calls, one to read the question and one to answer it.
 
 ### The embedding model
 
@@ -117,7 +144,8 @@ Three different PDF extractors were tried behind one `PdfExtractor` interface.
 
 ## Next steps
 
-1. **Async calls for production.** Today nothing is `async`, on purpose: it's built for one analyst on one machine (see [ARCHITECTURE.md](ARCHITECTURE.md)). With many users, each chat question waiting on Claude holds a thread from FastAPI's pool. Before going to production, move the chat route and the Claude and Mistral clients to their async versions (`async def` routes, `anthropic.AsyncAnthropic`), and replace the in-memory processing queue with a real job queue (arq, RQ) so jobs survive restarts and can run on more workers.
-2. **A database, with migrations.** Today reports and Conversations are files, which is enough for one process (see [ARCHITECTURE.md](ARCHITECTURE.md)). With several processes or users, move the metadata, Facts and Conversations to PostgreSQL, behind the existing repositories so the services don't change, and keep PDFs and page images in object storage. Manage the schema with Alembic, so a change like renaming a field is a versioned migration that runs on deploy, not a one-off script like `scripts/migrate_field_names.py`. pgvector could then hold the embeddings too, in place of `embeddings.npy` and the in-memory index.
-3. **Evaluate fact extraction.** Measure the recall of the FTE and the Sustainability Goals. Label a set of reports by hand: the FTE figure and every goal, each with its page. Then score what processing extracts against those labels: is the FTE found and correct, and what share of the labelled goals is found (with precision alongside, so a long list of non-goals doesn't look good). Run it whenever the prompt, the search queries or the PDF extractor change.
-4. **Evaluate the chat** with LangWatch's [agentic AI testing framework](https://langwatch.ai/agentic-ai-testing) (Scenario). A simulated user holds whole Conversations with the chat, follow-ups included ("and in 2025?"), and a judge checks each one against written criteria. Build the scenarios from Questions with known answers, including some the reports don't answer, and check that each Answer is right, that its Evidence quotes the page that states it, and that the unanswerable ones come back Not Found rather than a guess. The scenarios run as tests, so they can run in CI next to the existing suite.
+1. **Answer more than the FTE and the sustainability goals.** Today chat answers only from the two Facts extracted while processing, and any other question gets "Sorry, we only support…". Ideally it covers any topic in the report. Most of the pieces already exist: each report has a hybrid search index over its Passages, which processing uses to find the Fact candidates. For other topics, step 1 would return the topic instead of null, step 2 would search the matched reports' Passages for it, and step 3 would answer citing those Passages, with verbatim quotes and page highlights as today. The two Facts would stay as the fast, pre-checked answer for the most common questions.
+2. **Async calls for production.** Today nothing is `async`, on purpose: it's built for one analyst on one machine (see [ARCHITECTURE.md](ARCHITECTURE.md)). With many users, each chat question waiting on Claude holds a thread from FastAPI's pool. Before going to production, move the chat route and the Claude and Mistral clients to their async versions (`async def` routes, `anthropic.AsyncAnthropic`), and replace the in-memory processing queue with a real job queue (arq, RQ) so jobs survive restarts and can run on more workers.
+3. **A database, with migrations.** Today reports and Conversations are files, which is enough for one process (see [ARCHITECTURE.md](ARCHITECTURE.md)). With several processes or users, move the metadata, Facts and Conversations to PostgreSQL, behind the existing repositories so the services don't change, and keep PDFs and page images in object storage. Manage the schema with Alembic, so a change like renaming a field is a versioned migration that runs on deploy, not a one-off script like `scripts/migrate_field_names.py`. When the number of reports or users outgrows the in-memory, per-report index, move the embeddings to a vector store that supports hybrid search and metadata filtering by company and year.
+4. **Evaluate fact extraction.** Measure the recall of the FTE and the Sustainability Goals. Label a set of reports by hand: the FTE figure and every goal, each with its page. Then score what processing extracts against those labels: is the FTE found and correct, and what share of the labelled goals is found (with precision alongside, so a long list of non-goals doesn't look good). Run it whenever the prompt, the search queries or the PDF extractor change.
+5. **Evaluate the chat** with LangWatch's [agentic AI testing framework](https://langwatch.ai/agentic-ai-testing) (Scenario). A simulated user holds whole Conversations with the chat, follow-ups included ("and in 2025?"), and a judge checks each one against written criteria. Build the scenarios from Questions with known answers, including some the reports don't answer, and check that each Answer is right, that its Evidence quotes the page that states it, and that the unanswerable ones come back Not Found rather than a guess. The scenarios run as tests, so they can run in CI next to the existing suite.

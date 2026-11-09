@@ -12,12 +12,10 @@ Four layers, with the domain objects (see UBIQUITOUS_LANGUAGE.md) at the centre:
 4. **HTTP** (`routers/`): parse input, call `ReportService` or `ChatService`, map their errors to a status and an `ErrorCode`; the UI words the code. A route that only reads what upload stored, with no logic on top, reads `ReportRepository` directly.
 
 Imports point one way: `routers → chat → reports → facts → domain + generic tools`.
-
-## Package layout
-
 ```text
 .
-├── README.md, ARCHITECTURE.md, API.md, UBIQUITOUS_LANGUAGE.md, PRODUCT.md
+├── README.md, ARCHITECTURE.md, API.md, UBIQUITOUS_LANGUAGE.md
+├── docs/                       # the README's screenshots; how-it-works.html is the diagram's source
 ├── docker-compose.yml          # backend on :8000, frontend (nginx) on :8080
 ├── .env.example                # ANTHROPIC_API_KEY, MISTRAL_API_KEY and optional settings
 ├── models/fastembed/           # the embedding model, copied into the backend image
@@ -25,6 +23,7 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
 ├── backend/
 │   ├── Dockerfile, pyproject.toml, uv.lock
 │   ├── data/                   # runtime: reports/ and conversations/ (git-ignored)
+│   ├── scripts/                # migrate_field_names.py: one-off rename of old stored fields
 │   ├── tests/                  # pytest; conftest.py fakes Claude, Mistral, the embedder and the job queue
 │   └── src/report_analyst/
 │       ├── main.py             # the FastAPI app, routers, logging; start-up fails interrupted jobs
@@ -85,7 +84,9 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
 
 ## Chat
 
-Chat answers only what processing extracted, the FTE and the Sustainability Goals. `ChatService._answer_question` runs three steps, one module each, and makes every check between them; a check that fails raises `QuestionNotAnsweredError`, which `ask` stores as a Not Found with its reason:
+Chat answers only what processing extracted, the FTE and the Sustainability Goals. `ChatService._answer_question` runs three steps, one module each, and makes every check between them; a check that fails raises `QuestionNotAnsweredError`, which `ask` stores as a Not Found with its reason. Covering other topics by searching the Passages is a next step in README.md.
+
+The three steps:
 
 1. **Extract the filtering fields** (`filtering_fields.extract_filtering_fields`, structured output through Instructor). Claude gets the Question, the last three Questions and the stored reports (Company and year), and returns `FilteringFields`: the `fact` asked about (`fte`, `sustainability_goals`, or null for anything else) and the `company_year_pairs`. Since it sees the stored reports, it writes their Companies as stored ("ABN" is "ABN AMRO"); it gives a year only if the Question names one; a follow-up keeps the earlier Company. No fact is `unsupported_topic`; no pair is `no_company_named`.
 2. **Find the relevant Facts** (`relevant_facts.py`, in code, no model). `find_reports` matches each pair to the stored reports by Company (ignoring case) and year; a pair without a year is that Company's latest stored report. It returns the pairs with no report rather than raising, so `_answer_question` makes the check. A pair with no report is `no_matching_report`, naming it in `missing`; reports all still processing or failed are `report_not_ready`. The Facts of the kind asked about, from the ready reports, are the relevant Facts; none is `not_in_report`.
@@ -114,7 +115,7 @@ The UI shows the reports a Question was matched to under it. There are no Compan
 - **API contract.** The backend's Pydantic models are the source of truth. `npm run gen:api` dumps FastAPI's OpenAPI schema to `frontend/openapi.json` and generates `src/api/api.gen.ts`; `api/client.ts` re-exports the types under domain names. Change a backend model, run `gen:api`, and `npm run typecheck` shows every place the UI must follow.
 - **Base path.** The browser calls `/api/uploads`; Vite (dev) and nginx (Docker) strip `/api` and forward to the backend, so there is no CORS.
 - **Design tokens.** All raw values live in `ui/tokens.css`. Each component file in `ui/` has its stylesheet next to it (`chat.css`, `list.css`, …), using only tokens, enforced by stylelint. Screens compose `ui/` components and never write CSS or class names. A new look means a new component in `ui/`, not a style in a screen.
-- **Screens.** `App.tsx` lays out the page and holds the state the chat and the drawer share; `chat/ChatPanel.tsx` (the chat, with `useChat`) and `reports/ReportsDrawer.tsx` (the list and one report) hold their own. `mockup/combined/b-chat-first.html` is the reference layout.
+- **Screens.** `App.tsx` lays out the page and holds the state the chat and the drawer share; `chat/ChatPanel.tsx` (the chat, with `useChat`) and `reports/ReportsDrawer.tsx` (the list and one report) hold their own.
 
 ## Persistence
 
@@ -133,7 +134,7 @@ Nothing is `async`, on purpose. Most of the processing time is CPU work (embeddi
 
 Search runs in memory: `Retriever.search` loads a report's Passages, embeddings and a BM25 index on first use and keeps them, keyed by report id and when its `passages.json` was saved, so a replaced or retried report is reloaded. About 2 MB of vectors per 300-page report.
 
-SQLite comes when more than one process updates report statuses, or when conversations need searching or sharing. Not before: reports, passages and vectors as files keep one owner per report folder.
+A database (PostgreSQL, see Next steps in README.md) comes when more than one process updates report statuses, or when conversations need searching or sharing. Not before: reports, passages and vectors as files keep one owner per report folder.
 
 ## Deliberately skipped
 

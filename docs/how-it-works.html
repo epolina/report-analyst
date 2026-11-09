@@ -1,0 +1,108 @@
+<!doctype html>
+<!-- Source of docs/screenshots/how-it-works-{light,dark}.png; the numbered steps are listed in README.md.
+     To update: edit, then screenshot #canvas at 2x with a transparent background,
+     once as is and once with #dark in the URL. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How it works</title>
+<style>
+  :root {
+    --card: #ffffff; --line: #d3dcd8; --ink: #1c2522; --muted: #5d6b66;
+    --local: #2f7d66; --external: #c2603e; --arrow: #7d8c87; --badge: #1c2522; --badge-ink: #ffffff;
+  }
+  :root[data-theme="dark"] {
+    --card: #161b22; --line: #30363d; --ink: #e6edf3; --muted: #8b949e;
+    --local: #2f8f72; --external: #c96a47; --arrow: #7d8590; --badge: #e6edf3; --badge-ink: #0d1117;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: transparent; font: 14px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); }
+  #canvas { position: relative; width: 760px; height: 660px; }
+  .node { position: absolute; width: 180px; margin-left: -90px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .tile { width: 64px; height: 64px; border-radius: 16px; display: grid; place-items: center; color: #fff; background: var(--local); }
+  .tile.external { background: var(--external); }
+  .tile svg { width: 32px; height: 32px; }
+  .node b { margin-top: 8px; font-size: 15px; }
+  .node span, .backend span { font-size: 13px; color: var(--muted); }
+  .backend { position: absolute; left: 200px; top: 360px; width: 500px; height: 80px; display: flex; align-items: center; justify-content: center; gap: 14px; background: var(--card); border: 1.5px solid var(--local); border-radius: 16px; }
+  .backend .tile { width: 48px; height: 48px; border-radius: 12px; }
+  .backend .tile svg { width: 26px; height: 26px; }
+  .backend b { display: block; font-size: 15px; }
+  .label { position: absolute; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .label.left { text-align: right; }
+  .legend { position: absolute; left: 0; top: 10px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 8px; vertical-align: -1px; }
+  svg.wires { position: absolute; inset: 0; }
+  svg.wires text { font: 600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: var(--badge-ink); }
+</style>
+</head>
+<body>
+<script>if (location.hash === "#dark") document.documentElement.dataset.theme = "dark";</script>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M10 10h4v4h-4zM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
+    <symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3M8 9h8M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z"/><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+    <marker id="head" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--arrow)"/></marker>
+    <g id="badge"><circle r="10" fill="var(--badge)"/></g>
+  </defs>
+</svg>
+
+<div id="canvas">
+  <div class="legend"><span><i style="background:var(--local)"></i>Runs on your machine</span><span><i style="background:var(--external)"></i>External API</span></div>
+
+  <div class="node" style="left:450px;top:20px"><div class="tile"><svg><use href="#i-user"/></svg></div><b>Analyst</b></div>
+  <div class="node" style="left:450px;top:190px"><div class="tile"><svg><use href="#i-monitor"/></svg></div><b>Frontend</b><span>React, served by nginx</span></div>
+  <div class="backend"><div class="tile"><svg><use href="#i-server"/></svg></div><div><b>Backend</b><span>FastAPI: checks, searches, stores</span></div></div>
+  <div class="node" style="left:90px;top:368px"><div class="tile"><svg><use href="#i-folder"/></svg></div><b>Files</b><span>backend/data</span></div>
+  <div class="node" style="left:280px;top:540px"><div class="tile"><svg><use href="#i-cpu"/></svg></div><b>Embedding model</b><span>bge-small, on the CPU</span></div>
+  <div class="node" style="left:450px;top:540px"><div class="tile external"><svg><use href="#i-scan"/></svg></div><b>Mistral OCR</b><span>reads the PDF</span></div>
+  <div class="node" style="left:620px;top:540px"><div class="tile external"><svg><use href="#i-spark"/></svg></div><b>Claude</b><span>Anthropic API</span></div>
+
+  <svg class="wires" width="760" height="660" fill="none" stroke="var(--arrow)" stroke-width="1.8" text-anchor="middle" dominant-baseline="central">
+    <!-- analyst <-> frontend -->
+    <path d="M436 134V186" marker-end="url(#head)"/><path d="M464 186V134" marker-end="url(#head)"/>
+    <!-- frontend <-> backend -->
+    <path d="M436 304V356" marker-end="url(#head)"/><path d="M464 356V304" marker-end="url(#head)"/>
+    <!-- backend <-> files -->
+    <path d="M198 390H126" marker-end="url(#head)"/><path d="M126 412H198" marker-end="url(#head)"/>
+    <!-- backend <-> embedding, Mistral, Claude -->
+    <path d="M266 442V536" marker-end="url(#head)"/><path d="M294 536V442" marker-end="url(#head)"/>
+    <path d="M436 442V536" marker-end="url(#head)"/><path d="M464 536V442" marker-end="url(#head)"/>
+    <path d="M606 442V536" marker-end="url(#head)"/><path d="M634 536V442" marker-end="url(#head)"/>
+
+    <g stroke="none">
+      <use href="#badge" x="366" y="160"/><text x="366" y="160">1</text>
+      <use href="#badge" x="390" y="160"/><text x="390" y="160">7</text>
+      <use href="#badge" x="414" y="160"/><text x="414" y="160">8</text>
+      <use href="#badge" x="487" y="160"/><text x="487" y="160">7</text>
+      <use href="#badge" x="511" y="160"/><text x="511" y="160">12</text>
+      <use href="#badge" x="366" y="330"/><text x="366" y="330">2</text>
+      <use href="#badge" x="390" y="330"/><text x="390" y="330">7</text>
+      <use href="#badge" x="414" y="330"/><text x="414" y="330">8</text>
+      <use href="#badge" x="487" y="330"/><text x="487" y="330">7</text>
+      <use href="#badge" x="511" y="330"/><text x="511" y="330">12</text>
+      <use href="#badge" x="140" y="372"/><text x="140" y="372">2</text>
+      <use href="#badge" x="162" y="372"/><text x="162" y="372">6</text>
+      <use href="#badge" x="184" y="372"/><text x="184" y="372">12</text>
+      <use href="#badge" x="151" y="430"/><text x="151" y="430">7</text>
+      <use href="#badge" x="173" y="430"/><text x="173" y="430">10</text>
+      <use href="#badge" x="318" y="489"/><text x="318" y="489">4</text>
+      <use href="#badge" x="488" y="489"/><text x="488" y="489">3</text>
+      <use href="#badge" x="658" y="465"/><text x="658" y="465">5</text>
+      <use href="#badge" x="658" y="489"/><text x="658" y="489">9</text>
+      <use href="#badge" x="658" y="513"/><text x="658" y="513">11</text>
+    </g>
+  </svg>
+
+  <div class="label left" style="right:418px;top:152px">upload, open, ask</div>
+  <div class="label" style="left:530px;top:152px">Facts, answer</div>
+  <div class="label left" style="right:418px;top:322px">upload, open, ask</div>
+  <div class="label" style="left:530px;top:322px">Facts, answer + Evidence</div>
+</div>
+</body>
+</html>
