@@ -46,7 +46,7 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
 │       │   └── errors.py       # what can go wrong when adding a report
 │       ├── facts/
 │       │   ├── extractor.py    # FactExtractor: topic searches, then one Claude call
-│       │   └── answer.py       # the Facts as Claude writes them; checks each quote in its Passage
+│       │   └── model_output.py # the Facts as Claude writes them; checks each quote in its Passage
 │       ├── chat/
 │       │   ├── service.py      # ChatService: scope, search, Claude with citations; resolve_scope
 │       │   ├── repository.py   # ConversationRepository: one JSON file each
