@@ -237,25 +237,23 @@ class ChatService:
         fact: FactKind,
         stored_reports: list[Report],
     ) -> RelevantFacts:
-        reports: list[Report] = []
-        missing = []
-        for pair in company_year_pairs:
-            reports_for_pair = [r for r in stored_reports if _is_report_for(r, pair)]
-            if not reports_for_pair:
-                missing.append(f"{pair.company_name} {pair.reporting_year}")
-            reports += [r for r in reports_for_pair if r not in reports]
-        if missing:
-            raise QuestionNotAnsweredError(
-                NotFoundReason.NO_MATCHING_REPORT, missing=missing, reports=reports
-            )
+        reports = _find_reports_for_pairs(company_year_pairs, stored_reports)
         ready_reports = [r for r in reports if r.status is ReportStatus.SUCCESS]
         if not ready_reports:
             raise QuestionNotAnsweredError(NotFoundReason.REPORT_NOT_READY, reports=reports)
+        facts = self._collect_relevant_facts(ready_reports, fact)
+        return RelevantFacts(reports=reports, facts=facts)
+
+    def _collect_relevant_facts(self, reports: list[Report], fact: FactKind) -> list[RelevantFact]:
+        # Each report's stored Facts of the kind asked about: its FTE, or all its goals.
         relevant_facts: list[RelevantFact] = []
-        for report in ready_reports:
+        for report in reports:
             report_facts = self._reports.facts(report.report_id) or Facts()
-            relevant_facts += _collect_relevant_facts(report, report_facts, fact)
-        return RelevantFacts(reports=reports, facts=relevant_facts)
+            if fact is FactKind.FTE and report_facts.fte:
+                relevant_facts.append(RelevantFact(report, report_facts.fte))
+            if fact is FactKind.SUSTAINABILITY_GOALS:
+                relevant_facts += [RelevantFact(report, goal) for goal in report_facts.goals]
+        return relevant_facts
 
     def _generate_answer(
         self, question: str, history: list[Turn], fact: FactKind, relevant_facts: RelevantFacts
@@ -273,17 +271,31 @@ class ChatService:
         return Answer(kind="answer", text=cited_answer.text, evidence=evidence)
 
 
-def _is_report_for(report: Report, pair: CompanyYearPair) -> bool:
+def _find_reports_for_pairs(
+    company_year_pairs: list[CompanyYearPair], stored_reports: list[Report]
+) -> list[Report]:
+    # The stored reports for each pair, in the order asked. A pair with no stored report
+    # stops the Question, naming every such pair.
+    reports: list[Report] = []
+    missing = []
+    for pair in company_year_pairs:
+        reports_for_pair = [r for r in stored_reports if _report_matches_pair(r, pair)]
+        if not reports_for_pair:
+            missing.append(f"{pair.company_name} {pair.reporting_year}")
+        reports += [r for r in reports_for_pair if r not in reports]
+    if missing:
+        raise QuestionNotAnsweredError(
+            NotFoundReason.NO_MATCHING_REPORT, missing=missing, reports=reports
+        )
+    return reports
+
+
+def _report_matches_pair(report: Report, pair: CompanyYearPair) -> bool:
+    # The same Company (ignoring case) and the same Reporting Year.
     return (
         report.company_name.casefold() == pair.company_name.casefold()
         and report.reporting_year == pair.reporting_year
     )
-
-
-def _collect_relevant_facts(report: Report, facts: Facts, fact: FactKind) -> list[RelevantFact]:
-    if fact is FactKind.FTE:
-        return [RelevantFact(report, facts.fte)] if facts.fte else []
-    return [RelevantFact(report, goal) for goal in facts.goals]
 
 
 def _build_answer_prompt(
