@@ -2,6 +2,8 @@
 
 RAG system for analysing annual reports. Python backend, web frontend, runs locally, data persists across restarts.
 
+The key architectural decisions, with why and when to revisit each, are in README.md. This file has the details.
+
 ## Layers
 
 Four layers, with the domain objects (see UBIQUITOUS_LANGUAGE.md) at the centre:
@@ -14,7 +16,7 @@ Four layers, with the domain objects (see UBIQUITOUS_LANGUAGE.md) at the centre:
 Imports point one way: `routers → chat → reports → facts → domain + generic tools`.
 ```text
 .
-├── README.md, ARCHITECTURE.md, API.md, UBIQUITOUS_LANGUAGE.md
+├── README.md, ARCHITECTURE.md, UBIQUITOUS_LANGUAGE.md
 ├── docs/                       # the README's screenshots; how-it-works.html is the diagram's source
 ├── docker-compose.yml          # backend on :8000, frontend (nginx) on :8080
 ├── .env.example                # ANTHROPIC_API_KEY, MISTRAL_API_KEY and optional settings
@@ -94,22 +96,6 @@ The three steps:
 
 The UI shows the reports a Question was matched to under it. There are no Company or year selects: the Question, or the earlier ones for a follow-up, says which reports. The UI words every reason. Conversations are JSON files, so they survive a restart; the browser keeps the open one's id to show it again. Files stored before this still load: the old `scope` is ignored and `reports` defaults to empty.
 
-## File roles
-
-- **domain.py**: the domain objects as Pydantic models. Rules live as methods here (e.g. a quote must occur in a Passage on its page). No vendor types.
-- **Generic tool files**: one library each, plain types in and out (`bytes`, `str`, `Vectors`, row numbers). They raise their own errors (`ExtractionError`, `LLMError`).
-- **reports/service.py**: the use cases. It orchestrates the domain, the repository and the tools, and turns tool errors into domain errors from `errors.py`. It knows nothing about HTTP.
-- **reports/repository.py** and **chat/repository.py**: storage. Each alone knows its layout (folder and file names). Callers pass domain objects, never paths.
-- **routers/**: one file per resource. A route parses input, calls the service and maps its errors to status codes. Plain reads of stored files go to the repository instead.
-- **routers/dependencies.py**: the only place that builds the tools, the repository and the service. Values such as directories come from `AppSettings`, never from literals here.
-
-## Rules
-
-- Generic tools never import `domain`, `facts` or `reports`. If one needs a domain word, it belongs in the service.
-- `facts/` gets search as a function argument, so it never imports `reports`. Chat imports `reports` (it needs the report list for its scope); `reports` never imports chat.
-- Each package's `__init__.py` (`reports`, `chat`, `facts`, `pdf`) lists its public names under `__all__`. Code outside imports from the package (`from report_analyst.reports import ReportService`); code inside imports its modules by absolute path.
-- The original upload name is kept in `metadata.json` for reference only. It is never shown and never used as a path.
-
 ## Frontend
 
 - **API contract.** The backend's Pydantic models are the source of truth. `npm run gen:api` dumps FastAPI's OpenAPI schema to `frontend/openapi.json` and generates `src/api/api.gen.ts`; `api/client.ts` re-exports the types under domain names. Change a backend model, run `gen:api`, and `npm run typecheck` shows every place the UI must follow.
@@ -139,9 +125,6 @@ A database (PostgreSQL, see Next steps in README.md) comes when more than one pr
 ## Deliberately skipped
 
 - No task queue (arq, RQ, Celery): one in-memory worker thread, and a restart fails the running job (the user retries). Add one when jobs must survive restarts or run on more than one worker.
-- No `domain/` or `application/` folders. Split a file past about 300 lines.
-- No Company aggregate: the Company is a string on the report. A Company keeps the spelling it was first entered with, matched ignoring case ("shell" is stored as "Shell"); different names for one Company ("Royal Dutch Shell") aren't merged.
-- No auth or multi-user.
 - No interfaces (ABCs) for the LLM or the embedder. Each has one implementation, so the service takes `AnthropicLLM` and `Embedder` directly; tests swap them through `get_llm` and `get_embedder`. To add a second provider, extract an ABC from the class's public methods and change one line in `routers/dependencies.py`.
 - `PdfExtractor` is an ABC with one real child, `MistralExtractor`; tests swap in a local fake that reads the text layer. Children implement only `extract`, returning Blocks with their boxes. Page counting and rendering are plain functions in `pdf/rasterizer.py` (pdfium), the same whatever extracts the text. `routers/dependencies.py` builds the extractor once. README.md lists the extractors we tried before.
 

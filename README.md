@@ -8,12 +8,18 @@ Ask about the FTE and sustainability goals in companies' annual reports and get 
 
 Everything runs on your machine except two API calls: Mistral reads the PDF's text, and Claude writes the facts and answers. Data is stored as files under `backend/data/`.
 
-| | |
-|---|---|
-| ![A chat answer quoting the report, with the page each quote is on](docs/screenshots/chat-answer.png) | ![A report's facts beside its PDF page, the quote highlighted](docs/screenshots/report-evidence.png) |
-| An answer with its evidence: each quote is verbatim, with its page | A report's facts beside the page they come from, the quote highlighted |
-| ![A question about a report that isn't stored, answered "Not Found"](docs/screenshots/chat-not-found.png) | ![The Reports drawer, listing each report's status](docs/screenshots/reports.png) |
-| Asked about a report that isn't stored, the answer is "Not Found" and names it | The Reports drawer: add a report, see whether it's ready |
+## Architectural decisions
+
+| Decision | Why | Cost, and when to revisit |
+|---|---|---|
+| **Extract the Facts once, while processing.** Chat answers only from them. | Every quote is checked against its page before anyone sees it, and a question needs no search through the PDF, so answers are fast, cheap and consistent. | Chat covers only the FTE and the sustainability goals. To cover more, search the Passages at question time ([Next steps](#next-steps) 1). |
+| **Evidence is verbatim by construction, not by trust.** | At extraction, a quote that doesn't occur in its Passage is rejected and Claude retries. In chat, the citations API copies each quote from the Fact it cites, and an answer citing nothing is Not Found. | A report whose extraction keeps failing the check is marked Failed; the user retries it. |
+| **Claude reads the question; code picks the reports.** | Claude only extracts the fact and the Company-year pairs. Matching them to stored reports, picking the latest year when none is named and naming what's missing is plain code: deterministic, testable, and the model can't invent a report. | Two Claude calls per question instead of one. |
+| **Mistral OCR reads the PDF.** | It gives each block's position on the page, which the highlight needs, and reads 300 pages in about 30 seconds ([Data extraction experiments](#data-extraction-experiments)). | The PDF goes to Mistral's API. Any other extractor can replace it behind the `PdfExtractor` interface. |
+| **Hybrid search: BM25 plus local embeddings, fused by rank.** | Reports mix exact terms ("FTE", "Scope 1") with paraphrase, so each kind of search finds what the other misses. Rank fusion needs no score tuning, and bge-small runs on the CPU. | One in-memory index per report. With many reports, move to a vector store with hybrid search and filtering by Company and year. |
+| **Synchronous code, one background worker.** | Most processing time is CPU work, which `async` doesn't speed up. Routes are plain `def`, which FastAPI runs on its thread pool, so a question waiting on Claude holds one thread, not the server. | A restart loses the running job (the user retries it). With many users at once, go async and use a job queue ([Next steps](#next-steps) 2). |
+| **Files, not a database.** | One process, one owner per report folder, nothing to install; every write is atomic (temporary file, then rename). | With several processes or users, move to PostgreSQL with migrations ([Next steps](#next-steps) 3). |
+| **The backend's models are the API contract.** | The frontend's types are generated from FastAPI's OpenAPI schema, so a changed field fails the frontend's type check instead of breaking at runtime. | Run `npm run gen:api` after changing a backend model. |
 
 ## How it works
 
@@ -41,6 +47,13 @@ Everything runs on your machine except two API calls: Mistral reads the PDF's te
 | 12 | The backend saves the Conversation; the frontend shows the answer with each quote highlighted on its page, or Not Found | Files, Frontend |
 
 Chat never reads the PDF again: it answers only from the Facts saved while processing, so every quote was already checked against its page. [ARCHITECTURE.md](ARCHITECTURE.md) has each step in detail.
+
+| | |
+|---|---|
+| ![A chat answer quoting the report, with the page each quote is on](docs/screenshots/chat-answer.png) | ![A report's facts beside its PDF page, the quote highlighted](docs/screenshots/report-evidence.png) |
+| An answer with its evidence: each quote is verbatim, with its page | A report's facts beside the page they come from, the quote highlighted |
+| ![A question about a report that isn't stored, answered "Not Found"](docs/screenshots/chat-not-found.png) | ![The Reports drawer, listing each report's status](docs/screenshots/reports.png) |
+| Asked about a report that isn't stored, the answer is "Not Found" and names it | The Reports drawer: add a report, see whether it's ready |
 
 ## What you need
 
@@ -128,8 +141,8 @@ The tests need no API keys: Claude, Mistral and the embedding model are replaced
 
 ## Where to read next
 
-- [ARCHITECTURE.md](ARCHITECTURE.md): the layers and what each file does, how chat and processing work, and what was deliberately left out.
-- [API.md](API.md): the endpoints and their shapes.
+- [ARCHITECTURE.md](ARCHITECTURE.md): the layers and what each file does, how chat and processing work in detail, and what was deliberately left out.
+- The API: FastAPI's docs at [http://localhost:8000/docs](http://localhost:8000/docs) once it runs, or the schema in [frontend/openapi.json](frontend/openapi.json).
 - [UBIQUITOUS_LANGUAGE.md](UBIQUITOUS_LANGUAGE.md): the terms (Report, Passage, Evidence, Facts…) as the code and UI use them.
 
 ## Data extraction experiments
