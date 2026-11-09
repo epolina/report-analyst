@@ -8,7 +8,7 @@ from report_analyst.domain import Report, ReportStatus
 from report_analyst.llm import CitedSpan, CitedAnswer, LLMError
 from conftest import WHOLE_PAGE, FakeLLM, upload
 
-SPEND = "In 2024, we spent $1.2 billion on climate adaptation."
+SPEND_SENTENCE = "In 2024, we spent $1.2 billion on climate adaptation."
 
 
 def ask(client: TestClient, question: str, **body: object) -> dict:
@@ -20,14 +20,14 @@ def ask(client: TestClient, question: str, **body: object) -> dict:
 def answer(*quotes: str) -> CitedAnswer:
     return CitedAnswer(
         text="Shell spent $1.2 billion on climate adaptation in 2024.",
-        citations=[CitedSpan(document_index=0, text=q) for q in quotes or (SPEND,)],
+        citations=[CitedSpan(document_index=0, text=q) for q in quotes or (SPEND_SENTENCE,)],
     )
 
 
 def test_answers_with_evidence_from_the_report_named_in_the_question(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
-    shell = upload(client, make_pdf(SPEND)).json()["report_id"]
+    shell = upload(client, make_pdf(SPEND_SENTENCE)).json()["report_id"]
     upload(client, make_pdf("Heineken brewed beer."), company_name="Heineken")
     fake_llm.cited = answer()
 
@@ -41,15 +41,15 @@ def test_answers_with_evidence_from_the_report_named_in_the_question(
         "Shell",
         2024,
     )
-    assert (evidence["page"], evidence["quote"]) == (1, SPEND)
+    assert (evidence["page"], evidence["quote"]) == (1, SPEND_SENTENCE)
     [(title, text)] = fake_llm.documents  # only Shell was searched
-    assert (title, text) == ("Shell 2024, page 1", SPEND)
+    assert (title, text) == ("Shell 2024, page 1", SPEND_SENTENCE)
 
 
 def test_conversation_is_stored_and_follow_ups_see_earlier_turns(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
-    upload(client, make_pdf(SPEND))
+    upload(client, make_pdf(SPEND_SENTENCE))
     fake_llm.cited = answer()
     first = ask(client, "How much did Shell spend on climate adaptation?")
 
@@ -69,18 +69,18 @@ def test_conversation_is_stored_and_follow_ups_see_earlier_turns(
 def test_a_span_cited_twice_is_one_evidence(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
-    upload(client, make_pdf(SPEND))
-    fake_llm.cited = answer(SPEND, f" {SPEND}\n")
+    upload(client, make_pdf(SPEND_SENTENCE))
+    fake_llm.cited = answer(SPEND_SENTENCE, f" {SPEND_SENTENCE}\n")
 
     reply = ask(client, "How much did Shell spend?")
 
-    assert [e["quote"] for e in reply["answer"]["evidence"]] == [SPEND]
+    assert [e["quote"] for e in reply["answer"]["evidence"]] == [SPEND_SENTENCE]
 
 
 def test_an_answer_citing_nothing_is_not_found(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
-    upload(client, make_pdf(SPEND))
+    upload(client, make_pdf(SPEND_SENTENCE))
     fake_llm.cited = CitedAnswer(
         text="The report doesn't state carbon capture spend.", citations=[]
     )
@@ -98,7 +98,7 @@ def test_an_answer_citing_nothing_is_not_found(
 def test_no_report_in_scope_is_not_found_without_asking_the_model(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
-    upload(client, make_pdf(SPEND))
+    upload(client, make_pdf(SPEND_SENTENCE))
     prompts = len(fake_llm.prompts)
 
     reply = ask(
@@ -113,7 +113,7 @@ def test_no_report_in_scope_is_not_found_without_asking_the_model(
 def test_model_failure_is_502_and_stores_nothing(
     client: TestClient, make_pdf: Callable[[str], bytes], fake_llm: FakeLLM
 ) -> None:
-    upload(client, make_pdf(SPEND))
+    upload(client, make_pdf(SPEND_SENTENCE))
 
     def fail(prompt: str, documents: object) -> CitedAnswer:
         raise LLMError("down")
@@ -200,15 +200,15 @@ def test_citations_become_evidence_once_and_none_is_not_found() -> None:
         pages=9,
         status=ReportStatus.SUCCESS,
     )
-    blocks = [Block(page=7, kind=BlockKind.TEXT, text=SPEND, box=WHOLE_PAGE)]
+    blocks = [Block(page=7, kind=BlockKind.TEXT, text=SPEND_SENTENCE, box=WHOLE_PAGE)]
     found = [(report, Passage(index=0, page=7, heading="", blocks=blocks))]
     text = "Shell spent $1.2 billion."
 
     cited = CitedAnswer(
         text=text,
         citations=[
-            CitedSpan(document_index=0, text=f" {SPEND} "),
-            CitedSpan(document_index=0, text=SPEND),
+            CitedSpan(document_index=0, text=f" {SPEND_SENTENCE} "),
+            CitedSpan(document_index=0, text=SPEND_SENTENCE),
         ],
     )
     result = _to_answer(cited, found)
@@ -216,7 +216,7 @@ def test_citations_become_evidence_once_and_none_is_not_found() -> None:
     assert (result.kind, evidence.page, evidence.quote, evidence.boxes) == (
         "answer",
         7,
-        SPEND,
+        SPEND_SENTENCE,
         [WHOLE_PAGE],
     )
     assert (evidence.report_id, evidence.company_name, evidence.reporting_year) == (

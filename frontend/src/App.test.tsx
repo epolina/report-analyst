@@ -24,7 +24,7 @@ const REPLY = {
   },
 };
 
-function json(status: number, body: unknown) {
+function jsonResponse(status: number, body: unknown) {
   return Promise.resolve(new Response(JSON.stringify(body), { status }));
 }
 
@@ -41,7 +41,7 @@ afterEach(() => {
 test("asking, then starting a new chat, keeps the app on screen", async () => {
   vi.stubGlobal(
     "fetch",
-    vi.fn((url: string) => (url.endsWith("/chat") ? json(200, REPLY) : json(200, [REPORT]))),
+    vi.fn((url: string) => (url.endsWith("/chat") ? jsonResponse(200, REPLY) : jsonResponse(200, [REPORT]))),
   );
   render(<App />);
 

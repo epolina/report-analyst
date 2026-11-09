@@ -7,7 +7,7 @@ const REPORT = { report_id: "r1", company_name: "Shell", reporting_year: 2024, s
 const DUPLICATE = { code: "same_company_year", existing: REPORT };
 const SAME_FILE = { code: "same_file", existing: REPORT };
 
-function reply(status: number, body: unknown) {
+function jsonResponse(status: number, body: unknown) {
   return Promise.resolve(new Response(JSON.stringify(body), { status }));
 }
 
@@ -37,7 +37,7 @@ function fillAndSubmit(onClose = () => {}) {
   return onUploaded;
 }
 
-function sent(fetch: ReturnType<typeof vi.fn>, call: number) {
+function sentFormFields(fetch: ReturnType<typeof vi.fn>, call: number) {
   return Object.fromEntries((fetch.mock.calls[call][1].body as FormData).entries());
 }
 
@@ -53,21 +53,24 @@ test("checks the form before sending", () => {
 });
 
 test("a new report is sent trimmed and handed to onUploaded", async () => {
-  const fetch = vi.fn(() => reply(202, REPORT));
+  const fetch = vi.fn(() => jsonResponse(202, REPORT));
   vi.stubGlobal("fetch", fetch);
 
   const onUploaded = fillAndSubmit();
 
   await waitFor(() => expect(onUploaded).toHaveBeenCalledWith(REPORT));
-  expect(sent(fetch, 0)).toMatchObject({ company_name: "Shell", reporting_year: "2024" });
-  expect(sent(fetch, 0)).not.toHaveProperty("on_duplicate");
+  expect(sentFormFields(fetch, 0)).toMatchObject({ company_name: "Shell", reporting_year: "2024" });
+  expect(sentFormFields(fetch, 0)).not.toHaveProperty("on_duplicate");
 });
 
 test.each([
   ["Replace", "replace"],
   ["Keep both", "keep_both"],
 ])("a duplicate asks first, then %s resends with on_duplicate=%s", async (button, choice) => {
-  const fetch = vi.fn().mockReturnValueOnce(reply(409, DUPLICATE)).mockReturnValueOnce(reply(202, REPORT));
+  const fetch = vi
+    .fn()
+    .mockReturnValueOnce(jsonResponse(409, DUPLICATE))
+    .mockReturnValueOnce(jsonResponse(202, REPORT));
   vi.stubGlobal("fetch", fetch);
 
   const onUploaded = fillAndSubmit();
@@ -76,11 +79,11 @@ test.each([
   expect(onUploaded).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: button }));
   await waitFor(() => expect(onUploaded).toHaveBeenCalledWith(REPORT));
-  expect(sent(fetch, 1)).toMatchObject({ on_duplicate: choice });
+  expect(sentFormFields(fetch, 1)).toMatchObject({ on_duplicate: choice });
 });
 
 test("the same file can only be dropped", async () => {
-  const fetch = vi.fn(() => reply(409, SAME_FILE));
+  const fetch = vi.fn(() => jsonResponse(409, SAME_FILE));
   vi.stubGlobal("fetch", fetch);
   const onClose = vi.fn();
 
@@ -97,7 +100,7 @@ test("the same file can only be dropped", async () => {
 test("editing the form drops the duplicate question", async () => {
   vi.stubGlobal(
     "fetch",
-    vi.fn(() => reply(409, DUPLICATE)),
+    vi.fn(() => jsonResponse(409, DUPLICATE)),
   );
 
   fillAndSubmit();
