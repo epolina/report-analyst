@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from report_analyst.chat.models import Turn
 from report_analyst.domain import Fte, Report, SustainabilityGoal
+from report_analyst.llm import AnthropicLLM
 
 
 _EARLIER_QUESTIONS_IN_PROMPT = 3  # so a follow-up ("and in 2025?") keeps its Company
@@ -66,19 +67,30 @@ class FilteringFields(BaseModel):
     )
 
 
-def build_filtering_fields_prompt(
-    question: str, history: list[Turn], stored_reports: list[Report]
-) -> str:
-    """Build the prompt that reads the FilteringFields out of a Question.
+def extract_filtering_fields(
+    llm: AnthropicLLM, question: str, history: list[Turn], stored_reports: list[Report]
+) -> FilteringFields:
+    """Ask Claude which Fact a Question asks about, for which Company and year pairs.
 
     Args:
+        llm: Claude.
         question: The Question.
-        history: The Conversation's earlier Turns, oldest first.
+        history: The Conversation's earlier Turns, oldest first, so a follow-up keeps its
+            Company.
         stored_reports: Every stored report, so Claude writes their Companies as stored.
 
     Returns:
-        The prompt.
+        The FilteringFields: `fact` is None when the Question isn't about a Fact, and
+        `company_year_pairs` empty when it names no Company.
+
+    Raises:
+        LLMError: The model call failed or gave no valid answer.
     """
+    prompt = _build_prompt(question, history, stored_reports)
+    return llm.complete(prompt=prompt, schema=FilteringFields)
+
+
+def _build_prompt(question: str, history: list[Turn], stored_reports: list[Report]) -> str:
     return _FILTERING_FIELDS_PROMPT.format(
         stored_reports="\n".join(f"{r.company_name}, {r.reporting_year}" for r in stored_reports),
         fact_kinds="\n".join(f'   - "{kind}": {kind.fact_class.description}' for kind in FactKind),

@@ -15,8 +15,7 @@ from uuid import UUID
 from report_analyst.chat.filtering_fields import (
     CompanyYearPair,
     FactKind,
-    FilteringFields,
-    build_filtering_fields_prompt,
+    extract_filtering_fields,
 )
 from report_analyst.chat.models import (
     Answer,
@@ -197,7 +196,7 @@ class ChatService:
             raise QuestionNotAnsweredError(NotFoundReason.NO_REPORT)
 
         # 1. Which Fact the Question asks about, for which Company and year pairs.
-        filtering_fields = self._extract_filtering_fields(question, history, stored_reports)
+        filtering_fields = extract_filtering_fields(self._llm, question, history, stored_reports)
         if filtering_fields.fact is None:
             raise QuestionNotAnsweredError(NotFoundReason.UNSUPPORTED_TOPIC)
         if not filtering_fields.company_year_pairs:
@@ -219,12 +218,6 @@ class ChatService:
                 NotFoundReason.NOT_IN_REPORT, reports=relevant_facts.reports, text=answer.text
             )
         return Turn(question=question, reports=_report_refs(relevant_facts.reports), answer=answer)
-
-    def _extract_filtering_fields(
-        self, question: str, history: list[Turn], stored_reports: list[Report]
-    ) -> FilteringFields:
-        prompt = build_filtering_fields_prompt(question, history, stored_reports)
-        return self._llm.complete(prompt=prompt, schema=FilteringFields)
 
     def _find_relevant_facts(
         self,
