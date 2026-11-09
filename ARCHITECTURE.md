@@ -49,8 +49,10 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
 │       │   ├── extractor.py    # FactExtractor: topic searches, then one Claude call
 │       │   └── model_output.py # the Facts as Claude writes them; checks each quote in its Passage
 │       ├── chat/
-│       │   ├── service.py      # ChatService: extract fields, find relevant Facts, generate the answer
-│       │   ├── filtering_fields.py  # extract_filtering_fields: the Fact and Company-year pairs asked
+│       │   ├── service.py      # ChatService: the three steps in order, every check between them
+│       │   ├── filtering_fields.py   # step 1: extract_filtering_fields (Fact, Company-year pairs)
+│       │   ├── relevant_facts.py     # step 2: find_reports, collect_relevant_facts (no model)
+│       │   ├── answer_generation.py  # step 3: generate_answer, citing the Facts
 │       │   ├── repository.py   # ConversationRepository: one JSON file each
 │       │   └── models.py       # ReportRef, Answer, Turn, Conversation, ChatReply
 │       └── routers/
@@ -83,11 +85,11 @@ Imports point one way: `routers → chat → reports → facts → domain + gene
 
 ## Chat
 
-Chat answers only what processing extracted, the FTE and the Sustainability Goals. `ChatService._answer` has three steps, and a step that can't go on raises `QuestionNotAnsweredError`, which `ask` stores as a Not Found with its reason:
+Chat answers only what processing extracted, the FTE and the Sustainability Goals. `ChatService._answer_question` runs three steps, one module each, and makes every check between them; a check that fails raises `QuestionNotAnsweredError`, which `ask` stores as a Not Found with its reason:
 
 1. **Extract the filtering fields** (`filtering_fields.extract_filtering_fields`, structured output through Instructor). Claude gets the Question, the last three Questions and the stored reports (Company and year), and returns `FilteringFields`: the `fact` asked about (`fte`, `sustainability_goals`, or null for anything else) and the `company_year_pairs`. Since it sees the stored reports, it writes their Companies as stored ("ABN" is "ABN AMRO"); a Company without a year is its latest report; a follow-up keeps the earlier Company. No fact is `unsupported_topic`; no pair is `no_company_named`.
-2. **Find the relevant Facts** (in code, no model). Each pair is matched to the stored reports by Company (ignoring case) and year. A pair with no report is `no_matching_report`, naming it in `missing`; reports all still processing or failed are `report_not_ready`. The Facts of the kind asked about, from the ready reports, are the relevant Facts; none is `not_in_report`.
-3. **Generate the answer** (citations). Each relevant Fact is one document: the title names the report, page and fact ("ABN AMRO 2025, page 57: Sustainability goal: Net zero, deadline 2050", from `RelevantFact.as_document` and `SustainabilityGoal.as_string`) and the content is its verbatim quote. The prompt lists the reports asked about with what was found in each, and asks for one short part per report when there are several. A cited Fact becomes Evidence with its own page and boxes, as in the report view. An answer citing nothing is `not_in_report`, whatever its text says.
+2. **Find the relevant Facts** (`relevant_facts.py`, in code, no model). Each pair is matched to the stored reports by Company (ignoring case) and year. A pair with no report is `no_matching_report`, naming it in `missing`; reports all still processing or failed are `report_not_ready`. The Facts of the kind asked about, from the ready reports, are the relevant Facts; none is `not_in_report`.
+3. **Generate the answer** (`answer_generation.py`, citations). Each relevant Fact is one document: the title names the report, page and fact ("ABN AMRO 2025, page 57: Sustainability goal: Net zero, deadline 2050", from `SustainabilityGoal.as_string`) and the content is its verbatim quote. The prompt lists the reports asked about with what was found in each, and asks for one short part per report when there are several. A cited Fact becomes Evidence with its own page and boxes, as in the report view. An answer citing nothing is `not_in_report`, whatever its text says.
 
 The UI shows the reports a Question was matched to under it. There are no Company or year selects: the Question, or the earlier ones for a follow-up, says which reports. The UI words every reason. Conversations are JSON files, so they survive a restart; the browser keeps the open one's id to show it again. Files stored before this still load: the old `scope` is ignored and `reports` defaults to empty.
 

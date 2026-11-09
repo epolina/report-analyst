@@ -1,60 +1,32 @@
-"""Answers a Question from the extracted Facts, in three steps.
+"""Answers a Question from the extracted Facts, in three steps, and keeps the Conversation.
 
-1. Extract the filtering fields: Claude reads which Fact (FTE or Sustainability Goals) the
-   Question asks about, for which Company and year pairs.
-2. Find the relevant Facts: the stored reports for those pairs, and their Facts of that kind.
-3. Generate the answer: Claude answers from those Facts, citing them, so every quote is a
-   Fact's verified Evidence.
+1. Extract the filtering fields (`filtering_fields.py`): Claude reads which Fact (FTE or
+   Sustainability Goals) the Question asks about, for which Company and year pairs.
+2. Find the relevant Facts (`relevant_facts.py`): the stored reports for those pairs, and
+   their Facts of that kind.
+3. Generate the answer (`answer_generation.py`): Claude answers from those Facts, citing them.
 
-A step that can't go on raises `QuestionNotAnsweredError`; `ask` stores it as a Not Found.
+Every check between the steps is in `_answer_question`. One that fails raises
+`QuestionNotAnsweredError`, which `ask` stores as a Not Found.
 """
 
-from dataclasses import dataclass, field
 from uuid import UUID
 
-from report_analyst.chat.filtering_fields import (
-    CompanyYearPair,
-    FactKind,
-    extract_filtering_fields,
-)
+from report_analyst.chat.answer_generation import generate_answer
+from report_analyst.chat.filtering_fields import extract_filtering_fields
 from report_analyst.chat.models import (
     Answer,
-    ChatEvidence,
     ChatReply,
     Conversation,
     NotFoundReason,
     ReportRef,
     Turn,
 )
+from report_analyst.chat.relevant_facts import collect_relevant_facts, find_reports
 from report_analyst.chat.repository import ConversationRepository
-from report_analyst.domain import Facts, Fte, Report, ReportStatus, SustainabilityGoal
+from report_analyst.domain import Report, ReportStatus
 from report_analyst.llm import AnthropicLLM
 from report_analyst.reports import ReportRepository
-
-
-_EARLIER_TURNS_IN_PROMPT = 3  # so a follow-up makes sense
-
-_ANSWER_PROMPT = """\
-The documents above are facts extracted from companies' annual reports, all of one kind:
-{fact_description} Each title names the report, the page and the fact; each document is the
-quote from the report that states it.
-
-The reports asked about:
-{reports}
-
-{earlier_turns}Question: {question}
-
-{length} Cite the documents that state what you say. If they don't answer the question, say
-so in one sentence and cite nothing: an honest "not found" is better than a guess."""
-
-_LENGTH_FOR_ONE_REPORT = (
-    "Answer in plain text, in at most three sentences, with the figure and its unit if there"
-    " is one."
-)
-_LENGTH_FOR_SEVERAL_REPORTS = (
-    "Answer in plain text: a short paragraph for each report, then one or two sentences"
-    " comparing them. Say so if a report has no facts on this."
-)
 
 
 class ConversationNotFoundError(Exception):
@@ -92,49 +64,6 @@ class QuestionNotAnsweredError(Exception):
         self.missing = missing or []
         self.reports = reports or []
         self.text = text
-
-
-@dataclass(frozen=True)
-class RelevantFact:
-    """One Fact the Question asks about, with the report it is from."""
-
-    report: Report
-    fact: Fte | SustainabilityGoal
-
-    def as_document(self) -> tuple[str, str]:
-        """The Fact as a document Claude can cite: (title, content).
-
-        The title names the report, page and Fact, e.g. "Shell 2024, page 93: FTE 88,497".
-        The content is the report's verbatim quote, so whatever Claude cites from it is a
-        quote from the report. Claude can't cite the title.
-
-        Returns:
-            The title and the content.
-        """
-        report, evidence = self.report, self.fact.evidence
-        title = f"{report.company_name} {report.reporting_year}, page {evidence.page}"
-        return f"{title}: {self.fact.as_string()}", evidence.quote
-
-    def as_chat_evidence(self) -> ChatEvidence:
-        """The Fact's Evidence (quote, page, boxes) with its report, to show in the chat.
-
-        Returns:
-            The Evidence.
-        """
-        return ChatEvidence(
-            **self.fact.evidence.model_dump(),
-            report_id=self.report.report_id,
-            company_name=self.report.company_name,
-            reporting_year=self.report.reporting_year,
-        )
-
-
-@dataclass(frozen=True)
-class RelevantFacts:
-    """The reports a Question asks about, and their Facts of the kind it asks about."""
-
-    reports: list[Report]
-    facts: list[RelevantFact] = field(default_factory=list)
 
 
 class ChatService:
@@ -182,7 +111,7 @@ class ChatService:
         else:
             conversation = stored_conversation
         try:
-            turn = self._answer(question, conversation.turns)
+            turn = self._answer_question(question, conversation.turns)
         except QuestionNotAnsweredError as error:
             turn = _not_answered_turn(question, error)
         # Two Questions at once in one Conversation: the last save wins.
@@ -190,7 +119,7 @@ class ChatService:
         self._conversations.save(conversation)
         return ChatReply(conversation_id=conversation.conversation_id, **turn.model_dump())
 
-    def _answer(self, question: str, history: list[Turn]) -> Turn:
+    def _answer_question(self, question: str, history: list[Turn]) -> Turn:
         stored_reports = self._reports.list()
         if not stored_reports:
             raise QuestionNotAnsweredError(NotFoundReason.NO_REPORT)
@@ -203,119 +132,29 @@ class ChatService:
             raise QuestionNotAnsweredError(NotFoundReason.NO_COMPANY_NAMED)
 
         # 2. The stored reports for those pairs, and their Facts of that kind.
-        relevant_facts = self._find_relevant_facts(
-            filtering_fields.company_year_pairs, filtering_fields.fact, stored_reports
-        )
-        if not relevant_facts.facts:
+        found = find_reports(filtering_fields.company_year_pairs, stored_reports)
+        if found.missing_pairs:
+            missing = [f"{p.company_name} {p.reporting_year}" for p in found.missing_pairs]
             raise QuestionNotAnsweredError(
-                NotFoundReason.NOT_IN_REPORT, reports=relevant_facts.reports
+                NotFoundReason.NO_MATCHING_REPORT, missing=missing, reports=found.reports
             )
+        ready_reports = [r for r in found.reports if r.status is ReportStatus.SUCCESS]
+        if not ready_reports:
+            raise QuestionNotAnsweredError(NotFoundReason.REPORT_NOT_READY, reports=found.reports)
+        relevant_facts = collect_relevant_facts(self._reports, ready_reports, filtering_fields.fact)
+        if not relevant_facts:
+            raise QuestionNotAnsweredError(NotFoundReason.NOT_IN_REPORT, reports=found.reports)
 
         # 3. Claude's answer, citing those Facts.
-        answer = self._generate_answer(question, history, filtering_fields.fact, relevant_facts)
-        if not answer.evidence:  # nothing cited backs the text, whatever it says
+        generated = generate_answer(
+            self._llm, question, history, filtering_fields.fact, found.reports, relevant_facts
+        )
+        if not generated.evidence:  # nothing cited backs the text, whatever it says
             raise QuestionNotAnsweredError(
-                NotFoundReason.NOT_IN_REPORT, reports=relevant_facts.reports, text=answer.text
+                NotFoundReason.NOT_IN_REPORT, reports=found.reports, text=generated.text
             )
-        return Turn(question=question, reports=_report_refs(relevant_facts.reports), answer=answer)
-
-    def _find_relevant_facts(
-        self,
-        company_year_pairs: list[CompanyYearPair],
-        fact: FactKind,
-        stored_reports: list[Report],
-    ) -> RelevantFacts:
-        reports = _find_reports_for_pairs(company_year_pairs, stored_reports)
-        ready_reports = [r for r in reports if r.status is ReportStatus.SUCCESS]
-        if not ready_reports:
-            raise QuestionNotAnsweredError(NotFoundReason.REPORT_NOT_READY, reports=reports)
-        facts = self._collect_relevant_facts(ready_reports, fact)
-        return RelevantFacts(reports=reports, facts=facts)
-
-    def _collect_relevant_facts(self, reports: list[Report], fact: FactKind) -> list[RelevantFact]:
-        # Each report's stored Facts of the kind asked about: its FTE, or all its goals.
-        relevant_facts: list[RelevantFact] = []
-        for report in reports:
-            report_facts = self._reports.facts(report.report_id) or Facts()
-            if fact is FactKind.FTE and report_facts.fte:
-                relevant_facts.append(RelevantFact(report, report_facts.fte))
-            if fact is FactKind.SUSTAINABILITY_GOALS:
-                relevant_facts += [RelevantFact(report, goal) for goal in report_facts.goals]
-        return relevant_facts
-
-    def _generate_answer(
-        self, question: str, history: list[Turn], fact: FactKind, relevant_facts: RelevantFacts
-    ) -> Answer:
-        prompt = _build_answer_prompt(question, history, fact, relevant_facts)
-        documents = [relevant_fact.as_document() for relevant_fact in relevant_facts.facts]
-        cited_answer = self._llm.cite(prompt=prompt, documents=documents)
-
-        # A citation points at a document by its position, which is the Fact's position in
-        # `relevant_facts.facts`. Each cited Fact is shown once, even if Claude cites it twice.
-        cited_positions = dict.fromkeys(
-            citation.document_index for citation in cited_answer.citations if citation.text.strip()
-        )
-        evidence = [relevant_facts.facts[i].as_chat_evidence() for i in cited_positions]
-        return Answer(kind="answer", text=cited_answer.text, evidence=evidence)
-
-
-def _find_reports_for_pairs(
-    company_year_pairs: list[CompanyYearPair], stored_reports: list[Report]
-) -> list[Report]:
-    # The stored reports for each pair, in the order asked. A pair with no stored report
-    # stops the Question, naming every such pair.
-    reports: list[Report] = []
-    missing = []
-    for pair in company_year_pairs:
-        reports_for_pair = [r for r in stored_reports if _report_matches_pair(r, pair)]
-        if not reports_for_pair:
-            missing.append(f"{pair.company_name} {pair.reporting_year}")
-        reports += [r for r in reports_for_pair if r not in reports]
-    if missing:
-        raise QuestionNotAnsweredError(
-            NotFoundReason.NO_MATCHING_REPORT, missing=missing, reports=reports
-        )
-    return reports
-
-
-def _report_matches_pair(report: Report, pair: CompanyYearPair) -> bool:
-    # The same Company (ignoring case) and the same Reporting Year.
-    return (
-        report.company_name.casefold() == pair.company_name.casefold()
-        and report.reporting_year == pair.reporting_year
-    )
-
-
-def _build_answer_prompt(
-    question: str, history: list[Turn], fact: FactKind, relevant_facts: RelevantFacts
-) -> str:
-    # Each report asked about says what was found in it, so Claude can say which one has
-    # nothing on the Fact, or is still processing. An empty earlier answer is a Not Found
-    # the app decided; Claude still needs to know there was one.
-    reports = relevant_facts.reports
-    return _ANSWER_PROMPT.format(
-        fact_description=fact.fact_class.description,
-        reports="\n".join(f"- {_report_summary(r, fact, relevant_facts)}" for r in reports),
-        earlier_turns="".join(
-            f"Earlier question: {turn.question}\n"
-            f"Earlier answer: {turn.answer.text or '(not found)'}\n\n"
-            for turn in history[-_EARLIER_TURNS_IN_PROMPT:]
-        ),
-        question=question,
-        length=_LENGTH_FOR_ONE_REPORT if len(reports) == 1 else _LENGTH_FOR_SEVERAL_REPORTS,
-    )
-
-
-def _report_summary(report: Report, fact: FactKind, relevant_facts: RelevantFacts) -> str:
-    name = f"{report.company_name} {report.reporting_year}"
-    if report.status is ReportStatus.PROCESSING:
-        return f"{name}: still being processed, so it has no facts yet"
-    if report.status is ReportStatus.FAILED:
-        return f"{name}: processing failed, so it has no facts"
-    found = sum(1 for f in relevant_facts.facts if f.report.report_id == report.report_id)
-    if fact is FactKind.FTE:
-        return f"{name}: {'FTE found' if found else 'no FTE found'}"
-    return f"{name}: {found} sustainability goal{'' if found == 1 else 's'} found"
+        answer = Answer(kind="answer", text=generated.text, evidence=generated.evidence)
+        return Turn(question=question, reports=_report_refs(found.reports), answer=answer)
 
 
 def _report_refs(reports: list[Report]) -> list[ReportRef]:
